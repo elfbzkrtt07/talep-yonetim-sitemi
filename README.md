@@ -1,86 +1,52 @@
-# My Application
+# Müşteri Talep & İş Yönetim Sistemi
 
-A Spring Boot + Vaadin project. Build your UI in pure Java — no HTML, no JavaScript.
-
-> **New to Vaadin?** The 5-minute [Quickstart](https://vaadin.com/quickstart) walks you from here to your first running app, a live code change, and an AI-assisted edit with Copilot.
+Müşterilerden gelen destek ve geliştirme taleplerinin uçtan uca yönetilmesini, önceliklendirilmesini ve yazılım ekipleri tarafından çözülmesini sağlayan web tabanlı bir iş akışı ve talep yönetim platformudur.
 
 ---
 
-## Fastest start — no plugin needed
+## Sistem Aktörleri (Roller)
 
-From the project folder:
-
-```bash
-./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
-```
-
-No system Maven required — the wrapper is included. Then open **http://localhost:8080**.
-
-The first start takes ~30 seconds while Maven downloads dependencies. You'll get a runnable **Task List** app: a data grid (Description / Due Date / Creation Date), a Create button, and an empty-state message. When you see that, you're running.
-
-> **Port 8080 already in use?** Stop the other process, or set `server.port=8081` in `src/main/resources/application.properties` and open that port instead.
->
-> **To stop the app:** press `Ctrl+C` in the terminal (or the red Stop button if you launched from your IDE).
-
-## Optional upgrade — instant hotswap
-
-Running with `spring-boot:run` works, but Java code changes need a restart. For **live reload** — edit Java, see it in the browser without restarting — install the **Vaadin plugin** and start the app through it:
-
-- **IntelliJ IDEA:** install *Vaadin* from the JetBrains Marketplace → **Debug using Hotswap Agent** (dropdown next to Run). *Just installed it? Let IntelliJ finish indexing, or restart it, if the menu item isn't there yet.*
-- **VS Code:** install the *Vaadin* extension → **Vaadin: Debug using Hotswap Agent** from the command palette.
-- **Eclipse:** install the *Vaadin* plugin → right-click the project → **Run As → Vaadin Application**.
-
-This is what makes the edit-and-see-it loop feel instant — and it's required for the AI edits in [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot).
+Sistemde 4 temel kullanıcı rolü bulunmaktadır:
+1. **Müşteri (Customer):** Yeni destek veya geliştirme talebi oluşturur, kendi taleplerini takip eder ve gerektiğinde revize eder.
+2. **Ürün Yöneticisi / Sorumlusu (Product Manager):** Gelen talepleri iş etkisi, aciliyet vb. kriterlere göre değerlendirerek ürün yönetim skorunu (Talep Skoru) oluşturur ve ilgili departmana atar.
+3. **Yazılım Yöneticisi / Sorumlusu (Software Manager):** Departmanına atanan talepleri teknik açıdan değerlendirir, Teknik Talep Skoru oluşturur ve işi yazılımcılara atar.
+4. **Yazılımcı (Developer):** Kendisine atanan iş için süre tahmini yapar, kod geliştirmesini ve testlerini tamamlayarak işi sonuçlandırır.
 
 ---
 
-## Day 2: make your task list interactive (~10 min)
+## İş Akış Süreci (Workflow)
 
-Your app lists tasks. Let's make a row do something when you click it.
+Sistemdeki temel talep döngüsü şu şekildedir:
 
-**1. Add a click listener (by hand).** In `src/main/java/com/example/examplefeature/ui/TaskListView.java`, add this after the `taskGrid.addColumn(...)` block:
+1. **Talep Oluşturma:** Müşteri sistem üzerinden yeni bir talep bildirir.
+2. **Ürün Yönetimi Değerlendirmesi:** 
+   * Ürün Yöneticisi talebi inceler ve bir Talep Skoru oluşturur.
+   * Talebi ilgili departmana (örn. Yazılım) yönlendirir veya eksik bilgi durumunda müşteriye geri gönderir.
+3. **Teknik Değerlendirme:** 
+   * Yazılım Yöneticisi talebe istinaden Teknik Talep Skoru oluşturur.
+   * İşi ilgili yazılımcıya atar veya gerekirse yeniden değerlendirilmesi için Ürün Yöneticisine geri yönlendirir.
+4. **Geliştirme ve Test:**
+   * Yazılımcı talebi alır, süre tahmini yapar, kod geliştirmesini ve gerekli testleri gerçekleştirir.
+   * Testler başarısız olursa süreç geliştirme aşamasına geri döner.
+   * Testler başarılı olursa yazılımcı talebin durumunu 'TAMAMLANDI' olarak günceller.
 
-```java
-taskGrid.addItemClickListener(event ->
-    Notification.show("Due: " + Optional.ofNullable(event.getItem().getDueDate())
-        .map(LocalDate::toString)
-        .orElse("no due date")));
-```
+## Eklenen Özellikler
 
-Add the import: `import com.vaadin.flow.component.notification.Notification;`
+Sistemde 2 Temmuz 2026 (initial commit) itibariyle bulunan özellikler şu şekildedir:
 
-Save and click a task — a notification shows its due date. That's a server-side event handler, in pure Java.
+1. **Müşteri:**
+    * Talep başlığı, detayları, etkilenen kişi sayısı, talep türü ve talebe ilişkin belge gibi detayları girerek talep oluşturma/düzenleme.
+    * Geçmişte yüklenen talepleri ve taleplerin durumlarını görüntüleme.
 
-**2. Let Copilot finish it.** Open Copilot (bottom-right toolbar → **Edit mode**), click the AI assistant, and try:
+2. **Ürün Sorumlusu:**
+    * Müşteriler tarafından gelen talepleri inceleme, departmanlara atama ve iş etkisi, aciliyet gibi parametreleri girerek aciliyet skoru oluşturma.
+    * Aciliyet skoru girilen talepleri iş akışına dönüştürerek ilgili departmanın yazılım yöneticisine atama.
+    * Talepleri müşterilere geri gönderme ya da reddetme.
 
-> When a task row is clicked, open a dialog showing its description, due date, and creation date, with a Close button.
+3. **Yazılım Sorumlusu:**
+    * Ürün sorumlusu tarafından departmana atanan talepleri yazılımcıya atama ya da ürün sorumlusuna geri gönderme.
+    * Taleplere ait ürün sorumlusu tarafından girilen talep skorlarını görüntüleme ve teknik parametreleri girerek teknik aciliyet skoru oluşturma.
 
-Copilot writes the dialog into `TaskListView.java` for you. Open the file — your new code is right there.
-
----
-
-## Ask your AI assistant about Vaadin (optional)
-
-If you use Claude Code, Cursor, or another AI coding assistant, connect it to the **Vaadin MCP server** so it answers against real Vaadin docs and the exact API of your installed version — instead of guessing from outdated training data.
-
-```bash
-# One-time setup — see https://vaadin.com/docs/latest/building-apps/mcp
-```
-
-A `.mcp.json` is included (commented out by default). Uncomment it, or run the setup command above, to activate.
-
----
-
-## Build for production
-
-```bash
-./mvnw package
-java -jar target/*.jar
-```
-
-## Learn more
-
-- [Vaadin Quickstart](https://vaadin.com/quickstart) — the 5-minute getting-started path
-- [Components](https://vaadin.com/docs/latest/components) — 50+ UI components, all callable from Java
-- [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot) — visual + AI editing in the browser
-- [Full documentation](https://vaadin.com/docs)
+4. **Yazılımcı:**
+    * Yazılım yöneticisi tarafından kendisine atanan talepleri görüntüleme.
+    * Talepleri tamamlama, not ekleme ya da yazılım sorumlusuna geri gönderme.
