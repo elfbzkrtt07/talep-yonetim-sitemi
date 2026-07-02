@@ -1,0 +1,140 @@
+package com.example.services;
+
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.example.entities.Prioritization;
+import com.example.entities.Request;
+import com.example.entities.User;
+import com.example.entities.Workflow; 
+import com.example.enums.WorkflowStatus;
+import com.example.repositories.PrioritizationRepository;
+import com.example.repositories.RequestRepository;
+import com.example.repositories.UserRepository;
+
+import jakarta.persistence.EntityNotFoundException;
+
+@Service
+public class PrioritizationService {
+
+    private final PrioritizationRepository prioritizationRepository;
+    private final RequestRepository requestRepository;
+    private final UserRepository userRepository;
+
+    @Autowired
+    public PrioritizationService(PrioritizationRepository prioritizationRepository, RequestRepository requestRepository, UserRepository userRepository) {
+        this.prioritizationRepository = prioritizationRepository;
+        this.requestRepository = requestRepository;
+        this.userRepository = userRepository;
+    }
+
+    public List<Workflow> getWorkflowsForDepartment(Long departmentId) {
+        return prioritizationRepository.findUnassignedWorkflowsByDepartmentId(departmentId);
+    }
+
+    @Transactional
+    public Prioritization createPrioritizationFromRequest(Long requestId, Prioritization prioritization, 
+                                                          double taskTypeCoefficient, double waitTime, 
+                                                          double interventionTime) {
+        
+        Request request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found with id: " + requestId));
+        
+        double customerScore = 0.0;
+        if (request.getCustomer() != null) {
+            User customer = request.getCustomer();
+            
+            if (customer.getCompany() != null) {
+                customerScore = customer.getCompany().getCompanyScore();
+            }
+        }
+
+        double logInnerValue = 1.0 + (customerScore / 6.25);
+        double logBase2 = Math.log(logInnerValue) / Math.log(2); 
+        double customerFactor = 1.0 + logBase2;
+
+        double baseScore = prioritization.getImpact() * prioritization.getUrgency() * taskTypeCoefficient * (customerFactor + waitTime + interventionTime);
+
+        if (request.getAffectedNo() != null) {
+            baseScore += request.getAffectedNo();
+        }
+
+        prioritization.setPriorityScore((int) Math.round(baseScore));
+        prioritization.setRequest(request);
+
+        return prioritizationRepository.save(prioritization);
+    }
+
+    @Transactional
+    public Prioritization saveTechnicalEvaluation(Long requestId, Integer technicalScore, String smComment) {
+        Prioritization prioritization = prioritizationRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Prioritization matrix record not found for request id: " + requestId));
+        
+        prioritization.setSmTechnicalScore(technicalScore);
+        prioritization.setSmComment(smComment);
+        
+        return prioritizationRepository.save(prioritization);
+    }
+
+    @Transactional
+    public Prioritization updatePrioritization(Prioritization prioritization) {
+        Prioritization existing = prioritizationRepository.findById(prioritization.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Prioritization not found with id: " + prioritization.getId()));
+        
+        existing.setImpact(prioritization.getImpact());
+        existing.setUrgency(prioritization.getUrgency());
+        existing.setPriorityScore(prioritization.getPriorityScore());
+        existing.setTaskType(prioritization.getTaskType());
+        existing.setDepartment(prioritization.getDepartment());
+        
+        existing.setSmTechnicalScore(prioritization.getSmTechnicalScore());
+        existing.setSmComment(prioritization.getSmComment());
+        
+        return prioritizationRepository.save(existing);
+    }
+
+    public List<Prioritization> getAllPrioritizations() {
+        return prioritizationRepository.findAllWithDetails(); 
+    }
+
+    @Transactional(readOnly = true)
+    public Prioritization getPrioritizationById(Long id) {
+        return prioritizationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Record not found for ID: " + id));
+    }
+
+    @Transactional
+    public void completeTechnicalEvaluation(Long requestId, Integer technicalScore, String smComment, User assignedDev) {
+        Prioritization prioritization = prioritizationRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Prioritization record not found for request id: " + requestId));
+        
+        prioritization.setSmTechnicalScore(technicalScore);
+        prioritization.setSmComment(smComment);
+        prioritizationRepository.save(prioritization);
+
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, assignedDev, WorkflowStatus.DEVELOPMENT);
+    }
+
+    @Transactional
+    public void rejectBackToPm(Long requestId) {
+        Prioritization prioritization = prioritizationRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Record not found for request id: " + requestId));
+        prioritization.setSmTechnicalScore(null);
+        prioritization.setSmComment("Returned to PM for department/priority re-evaluation.");
+        prioritizationRepository.save(prioritization);
+
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.SENT_BACK_TO_PM); 
+    }
+
+
+    @Transactional
+    public void completeDeveloperJob(Long requestId) {
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.COMPLETED);
+    }
+
+    @Transactional
+    public void returnJobToTeamLeader(Long requestId) {
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.APPROVED_BY_PM);
+    }
+}

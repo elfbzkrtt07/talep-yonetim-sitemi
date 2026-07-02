@@ -1,74 +1,139 @@
 package com.example.base.ui;
 
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.Unit;
+import com.example.entities.User;
+import com.example.enums.UserRole;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
+import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
-import com.vaadin.flow.component.avatar.AvatarVariant;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
+import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.SvgIcon;
-import com.vaadin.flow.component.orderedlayout.*;
-import com.vaadin.flow.component.sidenav.SideNav;
-import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.router.Layout;
-import com.vaadin.flow.server.menu.MenuConfiguration;
-import com.vaadin.flow.server.menu.MenuEntry;
+import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.RouterLink;
+import com.vaadin.flow.server.VaadinSession;
+import com.example.views.HomeView;
+import com.example.views.customer.CustomerDashboardView;
 
-@Layout
-public final class MainLayout extends AppLayout {
+public class MainLayout extends AppLayout {
 
-    MainLayout() {
-        setPrimarySection(Section.DRAWER);
-        addToDrawer(createApplicationHeader(), createApplicationDrawer(), createApplicationFooter());
+    public MainLayout() {
+        createHeader();
+        createDrawer();
     }
 
-    private Component createApplicationHeader() {
-        // TODO Replace with real application logo and name
-        var appLogo = new Avatar("My Application");
-        appLogo.addClassName("app-logo");
-        appLogo.addThemeVariants(AvatarVariant.AURA_FILLED, AvatarVariant.XSMALL);
+    private void createHeader() {
+        H1 logo = new H1("TALEP YÖNETİM SİSTEMİ");
+        logo.getStyle().set("font-size", "var(--lumo-font-size-l)")
+                      .set("margin", "0 var(--lumo-space-m)")
+                      .set("font-weight", "bold");
 
-        var appName = new Span("My Application");
-        appName.addClassName("app-name");
+        User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
+        String userName = currentUser != null ? currentUser.getName() : "Misafir Kullanıcı";
+        String userEmail = currentUser != null ? currentUser.getEmail() : "";
 
-        var header = new HorizontalLayout(appLogo, appName);
-        header.setAlignItems(FlexComponent.Alignment.CENTER);
-        header.setPadding(true);
-        return header;
+        Avatar avatar = new Avatar(userName);
+        avatar.getStyle().set("cursor", "pointer");
+
+        HorizontalLayout profileWrapper = new HorizontalLayout(new Span(userName), avatar);
+        profileWrapper.setAlignItems(FlexComponent.Alignment.CENTER);
+        profileWrapper.setSpacing(true);
+        profileWrapper.getStyle().set("margin-right", "var(--lumo-space-m)");
+
+        // Dropdown menu attached to the profile wrapper
+        ContextMenu profileMenu = new ContextMenu(profileWrapper);
+        profileMenu.setOpenOnClick(true);
+
+        profileMenu.addItem("Profil Ayarları", e -> {
+            Notification.show("Profil ayarları yakında eklenecek.");
+        });
+        
+        profileMenu.addItem("Sistem Seçenekleri", e -> {
+            Notification.show("Sistem ayarları ayarlanıyor...");
+        });
+        
+        profileMenu.addSeparator();
+        profileMenu.addItem("Çıkış", e -> {
+            VaadinSession.getCurrent().close(); // Destroys session token
+            String roleString = currentUser.getRole().getUrlSegment();
+            UI.getCurrent().getPage().setLocation("/"+ roleString + "/login"); // Redirects home
+        });
+
+        HorizontalLayout header = new HorizontalLayout(new DrawerToggle(), logo, profileWrapper);
+        header.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        header.setWidthFull();
+        
+        header.expand(logo); 
+        
+        header.getStyle().set("background-color", "var(--lumo-base-color)")
+                        .set("border-bottom", "1px solid var(--lumo-contrast-10pct)")
+                        .set("padding", "0 var(--lumo-space-m)");
+
+        addToNavbar(header);
     }
 
-    private Component createApplicationDrawer() {
-        var scroller = new Scroller(createSideNav());
-        scroller.addThemeVariants(ScrollerVariant.OVERFLOW_INDICATORS);
-        return scroller;
-    }
+    private void createDrawer() {
+        VerticalLayout menuContainer = new VerticalLayout();
+        menuContainer.setSpacing(true);
+        menuContainer.setPadding(true);
 
-    private Component createApplicationFooter() {
-        var footer = new VerticalLayout(new Span("Made with ❤️ with Vaadin"));
-        footer.setAlignItems(FlexComponent.Alignment.CENTER);
-        footer.addClassName("app-footer");
-        return footer;
-    }
+        // 1. Fetch the logged-in user context dynamically
+        User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
 
-    private SideNav createSideNav() {
-        var nav = new SideNav();
-        nav.setMinWidth(200, Unit.PIXELS);
-        MenuConfiguration.getMenuEntries().forEach(entry -> nav.addItem(createSideNavItem(entry)));
-        return nav;
-    }
-
-    private SideNavItem createSideNavItem(MenuEntry menuEntry) {
-        if (menuEntry.icon() != null) {
-            Component icon = null;
-            if (menuEntry.icon().contains(".svg")) {
-                icon = new SvgIcon(menuEntry.icon());
-            } else {
-                icon = new Icon(menuEntry.icon());
-            }
-            return new SideNavItem(menuEntry.title(), menuEntry.menuClass(), icon);
-        } else {
-            return new SideNavItem(menuEntry.title(), menuEntry.menuClass());
+        if (currentUser == null || currentUser.getRole() == null) {
+            menuContainer.add(new Span("Menü yüklenemedi: Oturum Yok"));
+            addToDrawer(menuContainer);
+            return;
         }
+
+        UserRole role = currentUser.getRole();
+
+        switch (role) {
+
+            case CUSTOMER:
+                RouterLink customerDash = new RouterLink("Taleplerim", CustomerDashboardView.class);
+                
+                RouterLink newRequestShortcut = new RouterLink("Yeni Talep Aç", CustomerDashboardView.class);
+                newRequestShortcut.setQueryParameters(com.vaadin.flow.router.QueryParameters.simple(java.util.Map.of("action", "new")));
+                
+                RouterLink returnedRequests = new RouterLink("Geri Dönen Taleplerim", CustomerDashboardView.class);
+                returnedRequests.setQueryParameters(com.vaadin.flow.router.QueryParameters.simple(java.util.Map.of("filter", "sent_back")));
+                
+                menuContainer.add(customerDash, newRequestShortcut, returnedRequests);
+                break;
+
+            case PRODUCT_MANAGER:
+                RouterLink pmHome = new RouterLink("Ana Sayfa", com.example.views.pm.PMDashboardView.class);
+                RouterLink pmRequests = new RouterLink("Gelen Talepler", com.example.views.pm.PMRequestsView.class); 
+                RouterLink pmPriorities = new RouterLink("Öncelik Havuzu", com.example.views.pm.PMPrioritizationsView.class);
+                RouterLink pmWorkflows = new RouterLink("İş Akışları", com.example.views.pm.PMWorkflowsView.class);
+                // RouterLink pmAnalytics = new RouterLink("Analitik Raporlar", com.example.views.pm.PMAnalyticsView.class);
+                
+                menuContainer.add(pmHome, pmRequests, pmPriorities, pmWorkflows/*, pmAnalytics);*/ );
+                break;
+
+            case DEVELOPER:
+                RouterLink devTasks = new RouterLink("Bana Atanan İşler", com.example.views.developer.DeveloperDashboardView.class);
+                
+                menuContainer.add(devTasks);
+                break;
+
+            case SOFTWARE_MANAGER:
+                RouterLink smInbox = new RouterLink("Departmana Atanan İşler", com.example.views.sm.SMRequestsView.class);
+                
+                menuContainer.add(smInbox/* , smAnalytics*/);
+                break;
+
+            default:
+                menuContainer.add(new Span("Bilinmeyen Rol Menüsü"));
+                break;
+        }
+
+        addToDrawer(menuContainer);
     }
 }
