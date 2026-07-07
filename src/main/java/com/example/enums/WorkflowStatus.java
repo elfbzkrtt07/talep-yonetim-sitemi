@@ -10,6 +10,6 @@ public enum WorkflowStatus {
 
     // 🌟 Explicit "Sent Back" Loop Trackers
     SENT_BACK_TO_PM,    // SM rejected technical feasibility / sent it back to PM
-    SENT_BACK_TO_DEV,   // QA or SM rejected the developer's work, sent back to code
+    SENT_BACK_TO_SM,   // QA or SM rejected the developer's work, sent back to code
     REVISION_REQUIRED   // PM sent it all the way back to the Customer for clearer text
 }

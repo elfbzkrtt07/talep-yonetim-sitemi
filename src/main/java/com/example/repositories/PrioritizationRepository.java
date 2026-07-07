@@ -1,6 +1,7 @@
 package com.example.repositories;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -38,4 +39,17 @@ public interface PrioritizationRepository extends JpaRepository<Prioritization, 
     @Modifying
     @Query("UPDATE Workflow w SET w.status = :status WHERE w.request.id = :reqId")
     void sendBackToPm(@Param("reqId") Long requestId, @Param("status") WorkflowStatus status);
+
+    @Query("SELECT p FROM Prioritization p " +
+           "LEFT JOIN FETCH p.request r " +
+           "LEFT JOIN FETCH r.customer c " +
+           "LEFT JOIN FETCH p.department d " +
+           "WHERE p.id = :id")
+    Optional<Prioritization> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT p FROM Prioritization p " +
+       "JOIN FETCH p.request r " +
+       "JOIN FETCH r.customer " +
+       "WHERE NOT EXISTS (SELECT w FROM Workflow w WHERE w.id = p.id)")
+    List<Prioritization> findAllUnconvertedWithDetails();
 }

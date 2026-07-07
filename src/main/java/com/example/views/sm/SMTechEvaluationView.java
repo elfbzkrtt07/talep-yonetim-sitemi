@@ -8,6 +8,7 @@ import com.example.entities.User;
 import com.example.repositories.UserRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
+import com.example.services.WorkflowService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -33,7 +34,8 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
 
     private final RequestService requestService;
     private final PrioritizationService prioritizationService;
-    private final UserRepository userRepository; 
+    private final UserRepository userRepository;
+    private final WorkflowService workflowService;
 
     private Request targetRequest;
     private Prioritization currentPrioritization;
@@ -46,10 +48,13 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
 
     public SMTechEvaluationView(RequestService requestService, 
                                 PrioritizationService prioritizationService,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                WorkflowService workflowService
+                            ) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.userRepository = userRepository;
+        this.workflowService = workflowService;
 
         setSizeFull();
         setPadding(true);
@@ -175,7 +180,7 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     }
 
     private void sendWorkflowBackToProductManager() {
-        prioritizationService.rejectBackToPm(targetRequest.getId());
+        workflowService.rejectBackToPM(targetRequest.getId(), techScoreSelect.getValue(), smCommentArea.getValue().trim());
         
         Notification.show("Talep revize edilmesi için Ürün Yöneticisine geri gönderildi.")
                 .addThemeVariants(NotificationVariant.LUMO_PRIMARY);

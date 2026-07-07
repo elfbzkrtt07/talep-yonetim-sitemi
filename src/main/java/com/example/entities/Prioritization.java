@@ -39,6 +39,9 @@ public class Prioritization {
     @Column(name = "sm_comment", length = 1000)
     private String smComment;
 
+    @Column(name = "dev_comment", length = 1000)
+    private String devComment;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -70,7 +73,9 @@ public class Prioritization {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Request getRequest() { return request; }
+    public Request getRequest() { System.out.println("====== DEBUG ======= ======= GET REQUEST FROM PRI ======= ");
+    System.out.println("REQUEST ID:" + request.getId()); return request; }
+    
     public void setRequest(Request request) { this.request = request; }
 
     public Integer getUrgency() { return urgency; }
@@ -82,7 +87,6 @@ public class Prioritization {
     public TaskType getTaskType() { return taskType; }
     public void setTaskType(TaskType taskType) { this.taskType = taskType; }
 
-    // CHANGED: Updated Getter / Setter types
     public Department getDepartment() { return department; }
     public void setDepartment(Department department) { this.department = department; }
 
@@ -94,6 +98,9 @@ public class Prioritization {
 
     public String getSmComment() { return smComment; }
     public void setSmComment(String smComment) { this.smComment = smComment; }
+
+    public String getDevComment() { return devComment; }
+    public void setDevComment(String devComment) { this.devComment = devComment; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

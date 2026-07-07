@@ -4,6 +4,7 @@ import com.example.base.ui.MainLayout;
 import com.example.entities.Prioritization;
 import com.example.entities.Request;
 import com.example.services.PrioritizationService;
+import com.example.services.WorkflowService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -24,8 +25,10 @@ import com.vaadin.flow.router.Route;
 public class DeveloperEditView extends VerticalLayout implements HasUrlParameter<Long> {
 
     private final PrioritizationService prioritizationService;
+    private final WorkflowService workflowService;
 
     private Long requestId;
+    String devComment;
     private final H2 titleLabel = new H2("İş Düzenleme Sayfası");
     private final Span detailsContainer = new Span();
     private final TextArea devNotesArea = new TextArea("Not");
@@ -33,8 +36,9 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     private final Div priorityBadge = new Div();
     private final Div scoreContainer = new Div();
 
-    public DeveloperEditView(PrioritizationService prioritizationService) {
+    public DeveloperEditView(PrioritizationService prioritizationService, WorkflowService workflowService) {
         this.prioritizationService = prioritizationService;
+        this.workflowService = workflowService;
 
         setSizeFull();
         setPadding(true);
@@ -88,7 +92,7 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
         completeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
         completeBtn.setWidthFull();
 
-        Button sendBackBtn = new Button("GERİ GÖNDER", e -> sendTaskBackUpstream());
+        Button sendBackBtn = new Button("GERİ GÖNDER", e -> sendWorkflowBackToSoftwareManager());
         sendBackBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
         sendBackBtn.setWidthFull();
 
@@ -140,13 +144,17 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
 
     private void completeTaskJob() {
         prioritizationService.completeDeveloperJob(requestId);
+        devComment = devNotesArea.getValue().trim();
+        prioritizationService.completeDeveloperComment(requestId, devComment);
         Notification.show("İş başarıyla tamamlandı!").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         UI.getCurrent().navigate("dev/dashboard");
     }
 
-    private void sendTaskBackUpstream() {
-        prioritizationService.returnJobToTeamLeader(requestId);
+    private void sendWorkflowBackToSoftwareManager() {
+        devComment = devNotesArea.getValue().trim();
+        workflowService.rejectBackToSM(requestId, devComment);
+        
         Notification.show("İş tekrar değerlendirilmesi için takım liderine geri gönderildi.").addThemeVariants(NotificationVariant.LUMO_WARNING);
-        UI.getCurrent().navigate("dev/dashboard");
+            UI.getCurrent().navigate("dev/dashboard");
     }
 }

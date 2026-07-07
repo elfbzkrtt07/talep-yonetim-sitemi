@@ -108,7 +108,7 @@ public class PMPrioritizationsView extends VerticalLayout implements BeforeEnter
     }
 
     private void refreshGridData() {
-        List<Prioritization> activeBacklog = prioritizationService.getAllPrioritizations();
+        List<Prioritization> activeBacklog = prioritizationService.getAllUnconvertedpPrioritizations();
         activeBacklog.sort((p1, p2) -> p2.getPriorityScore().compareTo(p1.getPriorityScore()));
         prioritizationGrid.setItems(activeBacklog);
     }

@@ -22,7 +22,6 @@ public class PrioritizationService {
     private final RequestRepository requestRepository;
     private final UserRepository userRepository;
 
-    @Autowired
     public PrioritizationService(PrioritizationRepository prioritizationRepository, RequestRepository requestRepository, UserRepository userRepository) {
         this.prioritizationRepository = prioritizationRepository;
         this.requestRepository = requestRepository;
@@ -98,9 +97,13 @@ public class PrioritizationService {
         return prioritizationRepository.findAllWithDetails(); 
     }
 
+    public List<Prioritization> getAllUnconvertedpPrioritizations() {
+        return prioritizationRepository.findAllUnconvertedWithDetails(); 
+    }
+
     @Transactional(readOnly = true)
     public Prioritization getPrioritizationById(Long id) {
-        return prioritizationRepository.findById(id)
+        return prioritizationRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new IllegalArgumentException("Record not found for ID: " + id));
     }
 
@@ -117,16 +120,15 @@ public class PrioritizationService {
     }
 
     @Transactional
-    public void rejectBackToPm(Long requestId) {
+    public void completeDeveloperComment(Long requestId, String devComment) {
         Prioritization prioritization = prioritizationRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Record not found for request id: " + requestId));
-        prioritization.setSmTechnicalScore(null);
-        prioritization.setSmComment("Returned to PM for department/priority re-evaluation.");
+                .orElseThrow(() -> new IllegalArgumentException("Prioritization record not found for request id: " + requestId));
+        
+        prioritization.setDevComment(devComment);
         prioritizationRepository.save(prioritization);
 
-        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.SENT_BACK_TO_PM); 
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.SENT_BACK_TO_SM);
     }
-
 
     @Transactional
     public void completeDeveloperJob(Long requestId) {
@@ -134,7 +136,12 @@ public class PrioritizationService {
     }
 
     @Transactional
-    public void returnJobToTeamLeader(Long requestId) {
-        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.APPROVED_BY_PM);
+    public void returnJobToPM(Long requestId) {
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.SENT_BACK_TO_PM);
+    }
+
+    @Transactional
+    public void returnJobToSM(Long workflowId) {
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(workflowId, null, WorkflowStatus.SENT_BACK_TO_SM);
     }
 }

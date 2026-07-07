@@ -8,14 +8,12 @@ import jakarta.persistence.*;
 @Table(name = "elif_workflows")
 public class Workflow {
 
-    // 🌟 FIX: Removed @GeneratedValue strategy. The ID will now be derived directly from the Request entity
     @Id
     @Column(name = "workflow_id")
     private Long workflowId;
 
-    // 🌟 FIX: Changed from @ManyToOne to a strict @OneToOne relationship
     @OneToOne(fetch = FetchType.LAZY)
-    @MapsId // 🌟 Tells Hibernate to use the Request entity's ID value as this table's Primary Key
+    @MapsId
     @JoinColumn(name = "request_id", nullable = false)
     private Request request;
 
