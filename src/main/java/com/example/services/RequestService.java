@@ -53,10 +53,6 @@ public class RequestService {
         requestRepository.delete(request);
     }
 
-    public List<Request> getAllRequests() {
-        return requestRepository.findAll();
-    }
-
     public Request getRequestById(Long id) {
         return requestRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found with id: " + id));
@@ -105,5 +101,9 @@ public class RequestService {
 
     public List<com.example.entities.Workflow> getAllWorkflows() {
         return entityManager.createQuery("SELECT w FROM Workflow w JOIN FETCH w.request r JOIN FETCH r.customer", com.example.entities.Workflow.class).getResultList();
+    }
+
+    public List<Request> getAllRequests() {
+        return requestRepository.findAllWithCustomerAndCompany();
     }
 }

@@ -9,6 +9,7 @@ public class WorkflowLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "log_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -16,45 +17,57 @@ public class WorkflowLog {
     private Request request;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_by_id")
-    private User assignedBy;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_to_id", nullable = true)
-    private User assignedTo;
-    
-    @Column(name = "assigned_at", nullable = false)
-    private LocalDateTime assignedAt;
+    @Column(name = "log_text", length = 2000)
+    private String logText;
+
+    @Column(name = "file_name")
+    private String fileName;
 
     @Lob
-    @Column(name = "notes")
-    private String notes;
+    @Column(name = "file_bytes")
+    private byte[] fileBytes;
+
+    @Column(name = "from_status")
+    private String fromStatus;
+
+    @Column(name = "to_status")
+    private String toStatus;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public WorkflowLog() {}
 
-    public WorkflowLog(Request request, User assignedBy, User assignedTo, String notes) {
+    public WorkflowLog(Request request, User user, String logText, String fileName, byte[] fileBytes) {
         this.request = request;
-        this.assignedBy = assignedBy;
-        this.assignedTo = assignedTo;
-        this.assignedAt = LocalDateTime.now();
-        this.notes = notes;
+        this.user = user;
+        this.logText = logText;
+        this.fileName = fileName;
+        this.fileBytes = fileBytes;
     }
 
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
     public Request getRequest() { return request; }
     public void setRequest(Request request) { this.request = request; }
-
-    public User getAssignedBy() { return assignedBy; }
-    public void setAssignedBy(User assignedBy) { this.assignedBy = assignedBy; }
-
-    public User getAssignedTo() { return assignedTo; }
-    public void setAssignedTo(User assignedTo) { this.assignedTo = assignedTo; }
-
-    public LocalDateTime getAssignedAt() { return assignedAt; }
-    public void setAssignedAt(LocalDateTime assignedAt) { this.assignedAt = assignedAt; }
-
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public String getLogText() { return logText; }
+    public void setLogText(String logText) { this.logText = logText; }
+    public String getFileName() { return fileName; }
+    public void setFileName(String fileName) { this.fileName = fileName; }
+    public byte[] getFileBytes() { return fileBytes; }
+    public void setFileBytes(byte[] fileBytes) { this.fileBytes = fileBytes; }
+    public String getFromStatus() { return fromStatus; }
+    public void setFromStatus(String fromStatus) { this.fromStatus = fromStatus; }
+    public String getToStatus() { return toStatus; }
+    public void setToStatus(String toStatus) { this.toStatus = toStatus; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 }

@@ -34,17 +34,14 @@ public class WorkflowService {
 
         prioritizationService.saveTechnicalEvaluation(requestId, techScore, smNotes);
 
-        // Fixed here as well to maintain uniformity across the service
         Workflow workflow = workflowRepository.findById(requestId)
                 .orElse(new Workflow());
         
-        workflow.setworkflowId(requestId); // Explicitly ensure the shared ID is set if it's a new entity
+        workflow.setworkflowId(requestId);
         workflow.setRequest(request);
         workflow.setCurrentAssignee(developer);
         workflow.setStatus(WorkflowStatus.DEVELOPMENT); 
         workflowRepository.save(workflow);
-
-        workflowLogService.logAssignment(request, currentSm, developer, smNotes);
     }
 
     @Transactional
@@ -54,7 +51,6 @@ public class WorkflowService {
 
         prioritizationService.saveTechnicalEvaluation(requestId, techScore, rejectionNotes);
 
-        // CORRECTED: Direct primary key lookup to prevent Hibernate NonUniqueResultException
         Workflow workflow = workflowRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("No workflow cycle initiated for this request"));
         
@@ -81,13 +77,11 @@ public class WorkflowService {
         Request request = requestRepository.findById(requestId)
                 .orElseThrow(() -> requestNotFound);
 
-        // CORRECTED: Direct primary key lookup to prevent Hibernate NonUniqueResultException
         Workflow workflow = workflowRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("No active workflow record found"));
 
         workflow.setStatus(nextStatus);
         workflowRepository.save(workflow);
 
-        workflowLogService.logAssignment(request, developer, developer, progressNotes);
     }
 }

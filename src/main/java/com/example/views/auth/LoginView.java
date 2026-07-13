@@ -24,7 +24,6 @@ import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
 
-// 🚀 Standardized format matching your custom URL pattern
 @Route(value = ":currentRole/login", autoLayout = false)
 public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
@@ -193,22 +192,18 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         add(logo, masterPanel);
     }
 
-    // 🚀 FIXED SECTION: Uses BeforeEnterObserver to reliably extract the ":currentRole" path parameters
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
         java.util.Map<String, java.util.List<String>> queryParams = event.getLocation().getQueryParameters().getParameters();
 
-        // 1. Grab the current url segment directly out of the path tracker
         this.currentRole = event.getRouteParameters().get("currentRole").orElse("customer").toLowerCase();
 
-        // 2. Gate approval check overlay mapping
         if (queryParams.containsKey("approved") && "false".equals(queryParams.get("approved").get(0))) {
             this.removeAll();
             this.add(new WaitingApprovalView("Kullanıcı", currentRole));
             return;
         }
 
-        // 3. Dynamic layout configuration based on URL state
         companySelect.setVisible(false);
         departmentSelect.setVisible(false);
 

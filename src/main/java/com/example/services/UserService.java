@@ -3,7 +3,6 @@ package com.example.services;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.entities.Company;
@@ -16,8 +15,8 @@ import jakarta.transaction.Transactional;
 @Service
 public class UserService {
     private UserRepository userRepository;
+    private final String userNotFound = "User not found with id: ";
 
-    @Autowired
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
@@ -35,7 +34,7 @@ public class UserService {
     @Transactional
     public User approveUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException( userNotFound + userId));
         user.setApproved(true);
         return userRepository.save(user);
     }
@@ -43,7 +42,7 @@ public class UserService {
     @Transactional
     public User rejectUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException(userNotFound + userId));
         user.setApproved(false);
         sendRejectionEmail(user);
         return userRepository.save(user);
@@ -52,7 +51,7 @@ public class UserService {
     @Transactional
     public User updateUser(User user) {
         User existingUser = userRepository.findById(user.getId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + user.getId()));
+                .orElseThrow(() -> new IllegalArgumentException(userNotFound + user.getId()));
         existingUser.setName(user.getName());
         existingUser.setEmail(user.getEmail());
         existingUser.setPassword(user.getPassword());

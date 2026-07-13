@@ -1,9 +1,11 @@
 package com.example.views.developer;
 
 import com.example.base.ui.MainLayout;
+import com.example.entities.Prioritization;
 import com.example.entities.User;
 import com.example.entities.Workflow;
 import com.example.repositories.WorkflowRepository;
+import com.example.services.PrioritizationService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -21,10 +23,12 @@ import java.util.List;
 public class DeveloperDashboardView extends VerticalLayout {
 
     private final WorkflowRepository workflowRepository;
+    private final PrioritizationService prioritizationService;
     private final Grid<Workflow> taskGrid = new Grid<>(Workflow.class, false);
 
-    public DeveloperDashboardView(WorkflowRepository workflowRepository) {
+    public DeveloperDashboardView(WorkflowRepository workflowRepository, PrioritizationService prioritizationService) {
         this.workflowRepository = workflowRepository;
+        this.prioritizationService = prioritizationService;
 
         setSizeFull();
         setPadding(true);
@@ -41,7 +45,7 @@ public class DeveloperDashboardView extends VerticalLayout {
         
         taskGrid.addColumn(w -> {
             try {
-                return w.getRequest().getId(); 
+                return prioritizationService.getPrioritizationById(w.getRequest().getId()).getPriorityScore(); 
             } catch(Exception e) { return "-"; }
         }).setHeader("Skor").setAutoWidth(true);
 

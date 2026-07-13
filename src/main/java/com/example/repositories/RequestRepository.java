@@ -19,4 +19,9 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
     @Modifying
     @Query("UPDATE Request r SET r.status = :status WHERE r.id = :reqId")
     void updateRequestStatus(@Param("reqId") Long requestId, @Param("status") String status);
+
+    @Query("SELECT r FROM Request r " +
+           "LEFT JOIN FETCH r.customer u " +
+           "LEFT JOIN FETCH u.company c")
+    List<Request> findAllWithCustomerAndCompany();
 }
