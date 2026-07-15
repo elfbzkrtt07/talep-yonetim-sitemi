@@ -59,9 +59,8 @@ public class MainLayout extends AppLayout {
         
         profileMenu.addSeparator();
         profileMenu.addItem("Çıkış", e -> {
-            VaadinSession.getCurrent().close(); // Destroys session token
-            String roleString = currentUser.getRole().getUrlSegment();
-            UI.getCurrent().getPage().setLocation("/"+ roleString + "/login"); // Redirects home
+            VaadinSession.getCurrent().close();
+            UI.getCurrent().getPage().setLocation("/login");
         });
 
         HorizontalLayout header = new HorizontalLayout(new DrawerToggle(), logo, profileWrapper);

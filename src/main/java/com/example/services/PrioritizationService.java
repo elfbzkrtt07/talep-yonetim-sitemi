@@ -50,7 +50,7 @@ public class PrioritizationService {
         double customerFactor = 1.0 + logBase2;
 
         // 2. Base Matrix Math
-        double baseScore = prioritization.getImpact() * prioritization.getUrgency() * taskTypeCoefficient * (customerFactor + waitTime + interventionTime) / 2.5;
+        double baseScore = prioritization.getImpact() * prioritization.getUrgency() * taskTypeCoefficient * (customerFactor + waitTime + interventionTime) / 1.8;
 
         double affectedPointsModifier = 0.0;
         if (request.getAffectedNo() != null) {
@@ -93,7 +93,7 @@ public class PrioritizationService {
         double waitTime = 0.5; 
         double interventionTime = 0.2;
 
-        double baseScore = impact * urgency * taskTypeCoefficient * (customerFactor + waitTime + interventionTime)  / 2.5;
+        double baseScore = impact * urgency * taskTypeCoefficient * (customerFactor + waitTime + interventionTime)  / 1.8;
 
         double affectedPointsModifier = 0.0;
         if (request != null && request.getAffectedNo() != null) {

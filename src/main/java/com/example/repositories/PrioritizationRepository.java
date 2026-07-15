@@ -52,4 +52,8 @@ public interface PrioritizationRepository extends JpaRepository<Prioritization, 
        "JOIN FETCH r.customer " +
        "WHERE NOT EXISTS (SELECT w FROM Workflow w WHERE w.id = p.id)")
     List<Prioritization> findAllUnconvertedWithDetails();
+
+    @Modifying
+    @Query("DELETE FROM Prioritization p WHERE p.request.id = :requestId")
+    void deleteByRequestId(@Param("requestId") Long requestId);
 }

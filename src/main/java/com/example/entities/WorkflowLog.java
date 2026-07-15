@@ -28,6 +28,7 @@ public class WorkflowLog {
 
     @Lob
     @Column(name = "file_bytes")
+    @Basic(fetch = FetchType.EAGER)
     private byte[] fileBytes;
 
     @Column(name = "from_status")
@@ -35,6 +36,9 @@ public class WorkflowLog {
 
     @Column(name = "to_status")
     private String toStatus;
+
+    @Column(name = "is_internal", nullable = false)
+    private boolean isInternal = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -54,6 +58,15 @@ public class WorkflowLog {
         this.fileBytes = fileBytes;
     }
 
+    public WorkflowLog(Request request, User user, String logText, String fileName, byte[] fileBytes, boolean isInternal) {
+        this.request = request;
+        this.user = user;
+        this.logText = logText;
+        this.fileName = fileName;
+        this.fileBytes = fileBytes;
+        this.isInternal = isInternal;
+    }
+
     public Long getId() { return id; }
     public Request getRequest() { return request; }
     public void setRequest(Request request) { this.request = request; }
@@ -69,5 +82,7 @@ public class WorkflowLog {
     public void setFromStatus(String fromStatus) { this.fromStatus = fromStatus; }
     public String getToStatus() { return toStatus; }
     public void setToStatus(String toStatus) { this.toStatus = toStatus; }
+    public boolean isInternal() { return isInternal; }
+    public void setInternal(boolean isInternal) { this.isInternal = isInternal; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

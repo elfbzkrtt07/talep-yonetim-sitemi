@@ -1,10 +1,8 @@
 package com.example.views.auth;
 
-import com.example.entities.Company;
 import com.example.entities.Department;
 import com.example.entities.User;
 import com.example.enums.UserRole;
-import com.example.services.CompanyService;
 import com.example.services.DepartmentService;
 import com.example.services.UserService;
 import com.vaadin.flow.component.UI;
@@ -24,25 +22,22 @@ import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
 
-@Route(value = ":currentRole/login", autoLayout = false)
+@Route(value = "login", autoLayout = false)
 public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private final UserService userService;
-    private final CompanyService companyService;
     private final DepartmentService departmentService;
 
     private final H2 loginTitle = new H2("Giriş Yap");
     private final H2 registerTitle = new H2("Hesap Oluştur");
     private final Paragraph loginSub = new Paragraph("Yönetim paneline erişmek için bilgilerinizi girin.");
     private final Paragraph registerSub = new Paragraph("Sisteme dahil olmak için formu doldurun.");
-    private String currentRole = "customer"; 
 
-    private final Select<Company> companySelect = new Select<>();
+    private final Select<UserRole> roleSelect = new Select<>();
     private final Select<Department> departmentSelect = new Select<>();
 
-    public LoginView(UserService userService, CompanyService companyService, DepartmentService departmentService) {
+    public LoginView(UserService userService, DepartmentService departmentService) {
         this.userService = userService;
-        this.companyService = companyService;
         this.departmentService = departmentService;
 
         injectCustomCSS();
@@ -95,23 +90,30 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
             userService.findByEmail(inputEmail).ifPresentOrElse(user -> {
                 if (user.getPassword().equals(inputPass)) {
-                    String urlRole = currentRole.toLowerCase();
-
-                    // 🚀 Checks against the standardized custom enum mappings
-                    if (!user.getRole().getUrlSegment().equals(urlRole)) {
-                        Notification.show("Bu panel için giriş yetkiniz bulunmamaktadır!", 3000, Notification.Position.BOTTOM_START)
-                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                        return;
-                    }
                     if (user.isApproved()) {
                         Notification.show("Giriş Başarılı!").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                         com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("user", user);
-                        UI.getCurrent().navigate(currentRole + "/dashboard");
+                        
+                        switch (user.getRole()) {
+                            case CUSTOMER:
+                                UI.getCurrent().navigate("customer/dashboard");
+                                break;
+                            case DEVELOPER:
+                                UI.getCurrent().navigate("dev/dashboard");
+                                break;
+                            case SOFTWARE_MANAGER:
+                                UI.getCurrent().navigate("sm/requests");
+                                break;
+                            case PRODUCT_MANAGER:
+                                UI.getCurrent().navigate("pm/requests");
+                                break;
+                            default:
+                                Notification.show("Rol segmenti tanımlanamadı!").addThemeVariants(NotificationVariant.LUMO_ERROR);
+                                break;
+                        }
                     } else {
-                        UI.getCurrent().navigate(
-                            currentRole + "/login", 
-                            com.vaadin.flow.router.QueryParameters.simple(java.util.Map.of("approved", "false"))
-                        );
+                        this.removeAll();
+                        this.add(new WaitingApprovalView(user.getName(), user.getRole().name().toLowerCase()));
                     }
                 } else {
                     Notification.show("Hatalı Şifre!").addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -130,6 +132,16 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         registerTitle.addClassName("premium-heading");
         registerSub.addClassName("premium-subtext");
 
+        roleSelect.setLabel("Rol Seçin");
+        roleSelect.setItems(UserRole.values());
+        roleSelect.setItemLabelGenerator(role -> role.toString()); 
+        styleSelectorField(roleSelect, VaadinIcon.USER_CHECK); // Changed from FACTORY to USER_CHECK
+
+        roleSelect.addValueChangeListener(e -> {
+            UserRole selected = e.getValue();
+            departmentSelect.setVisible(selected == UserRole.DEVELOPER || selected == UserRole.SOFTWARE_MANAGER);
+        });
+
         TextField regName = new TextField("Tam İsim");
         styleInputField(regName, VaadinIcon.USER_CARD);
 
@@ -138,22 +150,20 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
         PasswordField regPass = new PasswordField("Şifre");
         styleInputField(regPass, VaadinIcon.PASSWORD);
-        
-        companySelect.setLabel("Şirket Seçin");
-        companySelect.setItemLabelGenerator(c -> c.getName() != null ? c.getName().trim() : "Şirket #" + c.getId());
-        companySelect.setItems(companyService.getAllCompanies());
-        styleSelectorField(companySelect, VaadinIcon.FACTORY);
 
         departmentSelect.setLabel("Departman Seçin");
         departmentSelect.setItemLabelGenerator(d -> d.getName() != null ? d.getName().trim() : "Departman #" + d.getId());
         departmentSelect.setItems(departmentService.getAllDepartments());
+        departmentSelect.setVisible(false);
         styleSelectorField(departmentSelect, VaadinIcon.BRIEFCASE);
+
+        roleSelect.setValue(UserRole.CUSTOMER); 
 
         Button registerBtn = new Button("Kayıt Başvurusunu Tamamla");
         registerBtn.addClassName("modern-btn-secondary");
 
         registerBtn.addClickListener(event -> {
-            if (regName.getValue().isEmpty() || regEmail.getValue().isEmpty() || regPass.getValue().isEmpty()) {
+            if (regName.getValue().isEmpty() || regEmail.getValue().isEmpty() || regPass.getValue().isEmpty() || roleSelect.getValue() == null) {
                 Notification.show("Zorunlu alanları doldurun!").addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
@@ -164,15 +174,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 newUser.setEmail(regEmail.getValue().trim());
                 newUser.setPassword(regPass.getValue()); 
 
-                UserRole targetRole = UserRole.CUSTOMER;
+                UserRole targetRole = roleSelect.getValue();
 
-                if (currentRole.equals("customer")) {
-                    newUser.setCompany(companySelect.getValue());
-                } else if (currentRole.equals("dev") || currentRole.equals("sm")) {
+                if (targetRole == UserRole.DEVELOPER || targetRole == UserRole.SOFTWARE_MANAGER) {
                     newUser.setDepartment(departmentSelect.getValue());
-                    targetRole = currentRole.equals("dev") ? UserRole.DEVELOPER : UserRole.SOFTWARE_MANAGER; 
-                } else if (currentRole.equals("pm")) {
-                    targetRole = UserRole.PRODUCT_MANAGER;
                 }
 
                 userService.registerNewUser(newUser, targetRole);
@@ -181,13 +186,13 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 
                 regName.clear(); regEmail.clear(); regPass.clear();
-                companySelect.clear(); departmentSelect.clear();
+                roleSelect.setValue(UserRole.CUSTOMER); departmentSelect.clear();
             } catch (Exception e) {
                 Notification.show("Hata: " + e.getMessage()).addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
 
-        rightPanel.add(registerTitle, registerSub, regName, regEmail, regPass, companySelect, departmentSelect, registerBtn);
+        rightPanel.add(registerTitle, registerSub, roleSelect, regName, regEmail, regPass, departmentSelect, registerBtn);
         masterPanel.add(leftPanel, rightPanel);
         add(logo, masterPanel);
     }
@@ -196,41 +201,9 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
     public void beforeEnter(BeforeEnterEvent event) {
         java.util.Map<String, java.util.List<String>> queryParams = event.getLocation().getQueryParameters().getParameters();
 
-        this.currentRole = event.getRouteParameters().get("currentRole").orElse("customer").toLowerCase();
-
         if (queryParams.containsKey("approved") && "false".equals(queryParams.get("approved").get(0))) {
             this.removeAll();
-            this.add(new WaitingApprovalView("Kullanıcı", currentRole));
-            return;
-        }
-
-        companySelect.setVisible(false);
-        departmentSelect.setVisible(false);
-
-        switch (currentRole) {
-            case "customer":
-                loginTitle.setText("Müşteri Girişi");
-                registerTitle.setText("Müşteri Kaydı");
-                companySelect.setVisible(true);
-                break;
-            case "dev":
-                loginTitle.setText("Geliştirici Girişi");
-                registerTitle.setText("Geliştirici Kaydı");
-                departmentSelect.setVisible(true);
-                break;
-            case "sm":
-                loginTitle.setText("Yazılım Sorumlusu");
-                registerTitle.setText("Sorumlu Kaydı");
-                departmentSelect.setVisible(true);
-                break;
-            case "pm":
-                loginTitle.setText("Ürün Yöneticisi");
-                registerTitle.setText("Yönetici Kaydı");
-                break;
-            default:
-                loginTitle.setText("Sistem Girişi");
-                registerTitle.setText("Sistem Kaydı");
-                break;
+            this.add(new WaitingApprovalView("Kullanıcı", "user"));
         }
     }
 

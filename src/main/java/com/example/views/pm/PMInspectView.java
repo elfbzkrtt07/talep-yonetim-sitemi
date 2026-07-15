@@ -9,6 +9,7 @@ import com.example.entities.WorkflowLog;
 import com.example.enums.RequestStatus;
 import com.example.enums.TaskType;
 import com.example.repositories.DepartmentRepository;
+import com.example.repositories.WorkflowLogRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
@@ -29,6 +30,8 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
@@ -48,13 +51,15 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     private final RequestService requestService;
     private final PrioritizationService prioritizationService;
     private final DepartmentRepository departmentRepository;
-    private final WorkflowLogService workflowLogService; // 🌟 Added for Group Chat Pipeline
+    private final WorkflowLogService workflowLogService;
+    private final WorkflowLogRepository workflowLogRepository;
     
     private Request targetRequest;
     private Long requestId;
     private boolean isUpdatingUi = false;
+    private boolean showingInternalTab = false;
 
-    private final Span detailsSpan = new Span();
+    private final VerticalLayout detailsCard = new VerticalLayout();
     private final Select<Integer> impactSelect = new Select<>();
     private final Select<Integer> urgencySelect = new Select<>();
     private final Select<TaskType> typeSelect = new Select<>();
@@ -63,22 +68,28 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     private final H1 scoreValue = new H1("0");
     private final Span priorityBadge = new Span("DÜŞÜK ÖNCELİKLİ");
 
-    // 🌟 Group Chat Area Elements
+    private final Tabs chatTabs = new Tabs();
+    private final Tab customerTab = new Tab("💬 Müşteri İletişimi");
+    private final Tab internalTab = new Tab("🔒 İç Değerlendirme");
+
     private final VerticalLayout chatHistoryArea = new VerticalLayout();
-    private final TextArea chatInputArea = new TextArea("Mesaj");
+    private final TextArea chatInputArea = new TextArea();
     private final Upload fileUpload;
     private final MemoryBuffer fileBuffer = new MemoryBuffer();
     private String uploadedFileName = null;
     private byte[] uploadedFileBytes = null;
+    private final Button rejectBtn = new Button("Talebi Müşteriye İade Et", VaadinIcon.ARROW_BACKWARD.create());
 
     public PMInspectView(RequestService requestService, 
                          PrioritizationService prioritizationService,
                          DepartmentRepository departmentRepository,
-                         WorkflowLogService workflowLogService) {
+                         WorkflowLogService workflowLogService,
+                         WorkflowLogRepository workflowLogRepository) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.departmentRepository = departmentRepository;
         this.workflowLogService = workflowLogService;
+        this.workflowLogRepository = workflowLogRepository;
 
         setSizeFull();
         setPadding(true);
@@ -92,12 +103,9 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         workspaceLayout.setWidthFull();
         workspaceLayout.setSpacing(true);
 
-        // --- LEFT PANEL: Request Details & Scoring Fields ---
         VerticalLayout leftPanel = new VerticalLayout();
         leftPanel.setWidth("60%");
         leftPanel.setPadding(false);
-
-        detailsSpan.getStyle().set("display", "block").set("margin-bottom", "20px");
 
         impactSelect.setLabel("İş Etkisi (Impact)");
         impactSelect.setItems(1, 2, 3, 4, 5);
@@ -120,9 +128,15 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         departmentField.setItems(departmentRepository.findAll());
         departmentField.setItemLabelGenerator(Department::getName);
         
-        leftPanel.add(detailsSpan, impactSelect, urgencySelect, typeSelect, departmentField);
+        Button highestPriorityBtn = new Button("Highest Priority", e -> setHighestPriority());
+        highestPriorityBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        highestPriorityBtn.setWidth("100px");
+        highestPriorityBtn.getStyle()
+            .set("background-color", "#c12a2a")
+            .set("margin-bottom", "15px");
 
-        // --- RIGHT PANEL: Score & Chat Group Stream ---
+        leftPanel.add(detailsCard, impactSelect, urgencySelect, typeSelect, departmentField, highestPriorityBtn);
+
         VerticalLayout rightPanel = new VerticalLayout();
         rightPanel.setWidth("40%");
         rightPanel.getStyle().set("background", "#eef2f7")
@@ -135,7 +149,6 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         scoreBox.setAlignItems(FlexComponent.Alignment.CENTER);
         scoreBox.setJustifyContentMode(FlexComponent.JustifyContentMode.AROUND);
 
-        // Inside PMInspectView constructor:
         VerticalLayout scoreValLayout = new VerticalLayout();
         scoreValLayout.setPadding(false);
         scoreValLayout.setSpacing(false);
@@ -168,14 +181,26 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         priorityBadge.getStyle().set("padding", "8px 16px").set("border-radius", "20px").set("font-weight", "bold").set("font-size", "0.85rem");
         scoreBox.add(scoreValLayout, priorityBadge);
 
+        chatTabs.add(customerTab, internalTab);
+        chatTabs.setWidthFull();
+        chatTabs.addSelectedChangeListener(event -> {
+            showingInternalTab = event.getSelectedTab().equals(internalTab);
+            rejectBtn.setVisible(!showingInternalTab);
+            refreshChatHistoryWindow();
+        });
+
         chatHistoryArea.setWidthFull();
-        chatHistoryArea.setHeight("240px");
+        chatHistoryArea.setHeight("220px");
         chatHistoryArea.getStyle()
                 .set("overflow-y", "auto")
                 .set("background", "#ffffff")
                 .set("border", "1px solid #cbd5e1")
                 .set("border-radius", "8px")
                 .set("padding", "12px");
+
+        rejectBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+        rejectBtn.setWidthFull();
+        rejectBtn.addClickListener(e -> openRejectReasonDialog());
 
         chatInputArea.setPlaceholder("Mesajınızı buraya yazın...");
         chatInputArea.setWidthFull();
@@ -206,25 +231,16 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         saveBtn.setWidthFull();
         saveBtn.addClickListener(e -> savePrioritizationData());
 
-        Span chatTitle = new Span("Talep İletişim Grubu");
-        chatTitle.getStyle().set("font-weight", "bold").set("font-size", "1.1rem").set("margin-bottom", "5px");
-
-        rightPanel.add(scoreBox, chatTitle, chatHistoryArea, chatInputArea, fileUpload, sendChatBtn, new Hr(), saveBtn);
+        rightPanel.add(scoreBox, chatTabs, chatHistoryArea, rejectBtn, chatInputArea, fileUpload, sendChatBtn, new Hr(), saveBtn);
         workspaceLayout.add(leftPanel, rightPanel);
         add(workspaceLayout);
 
-        // --- FOOTER BUTTON ROW ---
         HorizontalLayout actionRow = new HorizontalLayout();
         actionRow.setWidthFull();
         actionRow.getStyle().set("margin-top", "20px");
 
         Button backBtn = new Button("Geri Dön", VaadinIcon.ARROW_LEFT.create(), e -> UI.getCurrent().navigate("pm/requests"));
-        
-        Button rejectBtn = new Button("Müşteriye Geri Gönder", VaadinIcon.ARROW_BACKWARD.create(), e -> openRejectReasonDialog());
-        rejectBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-        rejectBtn.getStyle().set("margin-left", "auto");
-
-        actionRow.add(backBtn, rejectBtn);
+        actionRow.add(backBtn);
         add(actionRow);
 
         impactSelect.addValueChangeListener(e -> {
@@ -257,42 +273,113 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     }
 
     private void updateUiContent() {
-        isUpdatingUi = true;
+            isUpdatingUi = true;
 
-        detailsSpan.getElement().setProperty("innerHTML", 
-            "<h3><b>Talep Başlığı:</b> " + targetRequest.getTitle() + "</h3>" +
-            "<p style='color:#475569;'><b>Açıklama:</b> " + (targetRequest.getDescription() != null ? targetRequest.getDescription() : "-") + "</p>" +
-            "<span style='font-size:0.9rem; color:#64748b;'><b>Etkilenen Sayısı:</b> " + (targetRequest.getAffectedNo() != null ? targetRequest.getAffectedNo() : "Belirtilmemiş") + "</span>"
-        );
+            detailsCard.setWidthFull();
+            detailsCard.setPadding(true);
+            detailsCard.setSpacing(true);
+            detailsCard.getStyle()
+                    .set("background-color", "#ffffff")
+                    .set("border", "1px solid #e2e8f0")
+                    .set("border-radius", "12px")
+                    .set("box-shadow", "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)")
+                    .set("margin-bottom", "20px")
+                    .set("align-items", "stretch")
+                    .set("max-width", "100%")
+                    .set("box-sizing", "border-box");
 
-        try {
-            Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
+            detailsCard.removeAll();
+
+            H2 titleHeader = new H2(targetRequest.getTitle());
+            titleHeader.getStyle()
+                    .set("margin", "0")
+                    .set("font-size", "1.4rem")
+                    .set("font-weight", "800")
+                    .set("color", "#0f172a")
+                    .set("word-break", "break-word")
+                    .set("overflow-wrap", "anywhere");
+
+            VerticalLayout descContainer = new VerticalLayout();
+            descContainer.setPadding(false);
+            descContainer.setSpacing(false);
+            descContainer.getStyle().set("margin-top", "4px");
+
+            Span descLabel = new Span("TALEP AÇIKLAMASI");
+            descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
+
+            Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Açıklama belirtilmemiş.");
+            descBody.getStyle()
+                    .set("font-size", "0.95rem")
+                    .set("color", "#334155")
+                    .set("white-space", "pre-wrap")
+                    .set("word-break", "break-word")
+                    .set("overflow-wrap", "anywhere");
+            descContainer.add(descLabel, descBody);
+
+            HorizontalLayout badgesRow = new HorizontalLayout();
+            badgesRow.setSpacing(true);
+
+            Span affectedBadge = new Span();
+            affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+            if (targetRequest.getAffectedNo() != null) {
+                affectedBadge.setText(targetRequest.getAffectedNo() + " Kullanıcı Etkileniyor");
+                affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
+            } else {
+                affectedBadge.setText("Etkilenen Sayısı Belirtilmemiş");
+                affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+            }
+
+            Span companyBadge = new Span();
+            companyBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+            if (targetRequest.getCustomer() != null && targetRequest.getCustomer().getCompany() != null) {
+                String companyName = targetRequest.getCustomer().getCompany().getName();
+                double companyScore = targetRequest.getCustomer().getCompany().getCompanyScore();
+                companyBadge.setText(companyName + " (Score: " + companyScore + ")");
+                companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
+            } else {
+                companyBadge.setText("Bireysel Müşteri");
+                companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+            }
+
+            badgesRow.add(affectedBadge, companyBadge);
+            detailsCard.add(titleHeader, descContainer, badgesRow);
             
-            impactSelect.setValue(existingPrior.getImpact());
-            urgencySelect.setValue(existingPrior.getUrgency());
-            typeSelect.setValue(existingPrior.getTaskType());
-            departmentField.setValue(existingPrior.getDepartment());
-            
-            updateScoreBadgeVisuals(existingPrior.getPriorityScore());
-            
-        } catch (Exception ex) {
-            impactSelect.setValue(1);
-            urgencySelect.setValue(1);
-            if (TaskType.values().length > 0) typeSelect.setValue(TaskType.values()[0]);
-            departmentField.setValue(null);
-            
-            updateScoreBadgeVisuals(4);
-        } finally {
-            isUpdatingUi = false;
-            refreshChatHistoryWindow();
+            try {
+                Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
+                
+                impactSelect.setValue(existingPrior.getImpact());
+                urgencySelect.setValue(existingPrior.getUrgency());
+                typeSelect.setValue(existingPrior.getTaskType());
+                departmentField.setValue(existingPrior.getDepartment());
+                
+                updateScoreBadgeVisuals(existingPrior.getPriorityScore());
+                
+            } catch (Exception ex) {
+                impactSelect.setValue(1);
+                urgencySelect.setValue(1);
+                if (TaskType.values().length > 0) typeSelect.setValue(TaskType.values()[0]);
+                departmentField.setValue(null);
+            } finally {
+                isUpdatingUi = false;
+                refreshCalculatedScoreText();
+                refreshChatHistoryWindow();
+            }
         }
-    }
-
+        
     private void refreshChatHistoryWindow() {
         chatHistoryArea.removeAll();
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
         
-        List<WorkflowLog> chatLogs = workflowLogService.getChatHistoryForRequest(requestId);
+        if (showingInternalTab) {
+            chatHistoryArea.getStyle().set("background", "#fffbeb");
+        } else {
+            chatHistoryArea.getStyle().set("background", "#ffffff");
+        }
+
+        List<WorkflowLog> chatLogs = workflowLogRepository.findByRequestIdWithUser(requestId).stream()
+                .filter(log -> log.isInternal() == showingInternalTab)
+                .sorted((l1, l2) -> l1.getCreatedAt().compareTo(l2.getCreatedAt()))
+                .toList();
         
         for (WorkflowLog log : chatLogs) {
             HorizontalLayout row = new HorizontalLayout();
@@ -326,7 +413,11 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
             }
 
             if (log.getLogText() != null && !log.getLogText().isEmpty()) {
-                Div textDiv = new Div(new Span(log.getLogText()));
+                String text = log.getLogText();
+                if (text.contains("[MÜŞTERİYE İADE EDİLDİ]")) {
+                    text = text.replace("[MÜŞTERİYE İADE EDİLDİ]: Gerekçe:", "").trim();
+                }
+                Div textDiv = new Div(new Span(text));
                 textDiv.getStyle().set("margin-top", "4px").set("white-space", "pre-wrap");
                 bubble.add(textDiv);
             }
@@ -358,13 +449,20 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         }
 
         try {
-            workflowLogService.saveChatComment(
-                requestId, 
-                chatInputArea.getValue(), 
-                currentUser, 
-                uploadedFileName, 
-                uploadedFileBytes
-            );
+            WorkflowLog log = new WorkflowLog();
+            log.setRequest(targetRequest);
+            log.setUser(currentUser);
+            log.setLogText(chatInputArea.getValue() != null ? chatInputArea.getValue().trim() : null);
+            log.setFromStatus(targetRequest.getStatus().name());
+            log.setToStatus(targetRequest.getStatus().name());
+            log.setInternal(showingInternalTab);
+
+            if (uploadedFileBytes != null && uploadedFileName != null) {
+                log.setFileName(uploadedFileName);
+                log.setFileBytes(uploadedFileBytes);
+            }
+
+            workflowLogRepository.save(log);
 
             chatInputArea.clear();
             fileUpload.clearFileList();
@@ -394,7 +492,10 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     private void updateScoreBadgeVisuals(int score) {
         scoreValue.setText(String.valueOf(score));
 
-        if (score >= 60) {
+        if (score > 100) {
+            priorityBadge.setText("YÖNETİCİ MÜDAHALESİ");
+            priorityBadge.getStyle().set("background", "#f19595").set("color", "#780303");
+        } else if (score >= 60) {
             priorityBadge.setText("YÜKSEK ÖNCELİKLİ");
             priorityBadge.getStyle().set("background", "#fee2e2").set("color", "#ef4444");
         } else if (score >= 24) {
@@ -427,7 +528,6 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         );
         prioritization.setId(targetRequest.getId());
 
-        // 🌟 Log the systematic task pool approval entry to the chat chain history thread
         if (currentUser != null) {
             workflowLogService.saveChatComment(requestId, "[TALEP ONAYLANDI]: Talep incelendi ve öncelik havuzuna aktarıldı. Skor: " + calculatedScoreInt, currentUser, null, null);
         }
@@ -455,13 +555,13 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
             }
 
             User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-            targetRequest.setStatus(RequestStatus.SENT_BACK);
 
             if (currentUser != null) {
                 workflowLogService.saveChatComment(requestId, "[MÜŞTERİYE İADE EDİLDİ]: Gerekçe: " + note, currentUser, null, null);
             }
 
-            requestService.updateRequest(targetRequest);
+            requestService.updateRequestStatus(targetRequest.getId(), RequestStatus.SENT_BACK);
+            
             Notification.show("Talep müşteriye geri gönderildi.").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             
             rejectDialog.close();
@@ -471,5 +571,9 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
 
         rejectDialog.getFooter().add(new Button("İptal", c -> rejectDialog.close()), submitReject);
         rejectDialog.open();
+    }
+
+    private void setHighestPriority() {
+        updateScoreBadgeVisuals(1000);
     }
 }

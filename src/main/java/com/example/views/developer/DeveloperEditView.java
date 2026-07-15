@@ -6,6 +6,7 @@ import com.example.entities.Request;
 import com.example.entities.User;
 import com.example.entities.WorkflowLog;
 import com.example.services.PrioritizationService;
+import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
 import com.example.services.WorkflowService;
 import com.vaadin.flow.component.UI;
@@ -32,6 +33,7 @@ import com.vaadin.flow.server.VaadinSession;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
+import java.util.Optional;
 
 @Route(value = "dev/edit", layout = MainLayout.class)
 public class DeveloperEditView extends VerticalLayout implements HasUrlParameter<Long> {
@@ -39,10 +41,11 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     private final PrioritizationService prioritizationService;
     private final WorkflowService workflowService;
     private final WorkflowLogService workflowLogService;
+    private final RequestService requestService;
 
     private Long requestId;
     private final H2 titleLabel = new H2("İş Düzenleme Sayfası");
-    private final Span detailsContainer = new Span();
+    private final VerticalLayout detailsCard = new VerticalLayout();
     private final TextArea devNotesArea = new TextArea("Mesaj");
 
     private final Div priorityBadge = new Div();
@@ -57,10 +60,12 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
 
     public DeveloperEditView(PrioritizationService prioritizationService, 
                              WorkflowService workflowService, 
-                             WorkflowLogService workflowLogService) {
+                             WorkflowLogService workflowLogService,
+                             RequestService requestService) {
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
         this.workflowLogService = workflowLogService;
+        this.requestService = requestService;
 
         setSizeFull();
         setPadding(true);
@@ -73,8 +78,6 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
         VerticalLayout infoColumn = new VerticalLayout();
         infoColumn.setWidth("60%");
         infoColumn.setPadding(false);
-
-        detailsContainer.getStyle().set("display", "block").set("width", "100%");
         
         HorizontalLayout visualBadgesRow = new HorizontalLayout();
         visualBadgesRow.setWidthFull();
@@ -115,7 +118,7 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
                 .set("margin-left", "20px");
 
         visualBadgesRow.add(priorityBadge, scoreContainer, techScoreContainer);
-        infoColumn.add(titleLabel, detailsContainer, visualBadgesRow);
+        infoColumn.add(titleLabel, detailsCard, visualBadgesRow);
 
         VerticalLayout actionsColumn = new VerticalLayout();
         actionsColumn.setWidth("40%");
@@ -187,26 +190,95 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     @Override
     public void setParameter(BeforeEvent event, Long parameter) {
         this.requestId = parameter;
+        
+        Request r = requestService.getRequestById(requestId);
+        if (r == null) {
+            Notification.show("Talep kaydi bulunamadi!").addThemeVariants(NotificationVariant.LUMO_ERROR);
+            UI.getCurrent().navigate("dev/dashboard");
+            return;
+        }
+
+        detailsCard.setWidthFull();
+        detailsCard.setPadding(true);
+        detailsCard.setSpacing(true);
+        detailsCard.getStyle()
+                .set("background-color", "#ffffff")
+                .set("border", "1px solid #e2e8f0")
+                .set("border-radius", "12px")
+                .set("box-shadow", "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)")
+                .set("margin-bottom", "20px")
+                .set("align-items", "stretch")
+                .set("max-width", "100%")
+                .set("box-sizing", "border-box");
+
+        detailsCard.removeAll();
+
+        H2 titleHeader = new H2(r.getTitle());
+        titleHeader.getStyle()
+                .set("margin", "0")
+                .set("font-size", "1.4rem")
+                .set("font-weight", "800")
+                .set("color", "#0f172a")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
+
+        VerticalLayout descContainer = new VerticalLayout();
+        descContainer.setPadding(false);
+        descContainer.setSpacing(false);
+        descContainer.getStyle().set("margin-top", "4px");
+
+        Span descLabel = new Span("MUSTERI TALEP ACIKLAMASI");
+        descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
+
+        Span descBody = new Span(r.getDescription() != null ? r.getDescription() : "Aciklama belirtilmemis.");
+        descBody.getStyle()
+                .set("font-size", "0.95rem")
+                .set("color", "#334155")
+                .set("white-space", "pre-wrap")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
+        descContainer.add(descLabel, descBody);
+
+        HorizontalLayout badgesRow = new HorizontalLayout();
+        badgesRow.setSpacing(true);
+
+        Span affectedBadge = new Span();
+        affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (r.getAffectedNo() != null) {
+            affectedBadge.setText(r.getAffectedNo() + " Etkilenen");
+            affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
+        } else {
+            affectedBadge.setText("Belirtilmemis");
+            affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        }
+
+        Span companyBadge = new Span();
+        companyBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (r.getCustomer() != null && r.getCustomer().getCompany() != null) {
+            String companyName = r.getCustomer().getCompany().getName();
+            double companyScore = r.getCustomer().getCompany().getCompanyScore();
+            companyBadge.setText(companyName + " (Score: " + companyScore + ")");
+            companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
+        } else {
+            companyBadge.setText("Bireysel");
+            companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        }
+
+        badgesRow.add(affectedBadge, companyBadge);
+        detailsCard.add(titleHeader, descContainer, badgesRow);
+
         try {
             Prioritization p = prioritizationService.getPrioritizationById(requestId);
-            Request r = p.getRequest();
-
-            detailsContainer.getElement().setProperty("innerHTML",
-                "<div style='margin-bottom: 25px; font-size: 1.1rem; line-height: 1.6;'>" +
-                "<p><b>Talep Başlığı:</b> " + r.getTitle() + "</p>" +
-                "<p><b>Talep Açıklaması:</b> " + (r.getDescription() != null ? r.getDescription() : "-") + "</p><hr style='border:0; border-top:1px solid #e2e8f0; margin:20px 0;'/>" +
-                "<p style='color:#475569;'><b>İş Etkisi (Impact):</b> " + p.getImpact() + "</p>" +
-                "<p style='color:#475569;'><b>Aciliyet (Urgency):</b> " + p.getUrgency() + "</p>" +
-                "<p style='color:#475569;'><b>Sorumlu Departman:</b> " + (p.getDepartment() != null ? p.getDepartment().getName() : "-") + "</p>" +
-                "</div>"
-            );
 
             scoreContainer.getElement().setProperty("innerHTML",
                 "<span style='font-size:0.75rem; color:#64748b; font-weight:800; letter-spacing: 0.05em; margin-bottom: 2px;'>HESAPLANAN SKOR</span>" +
                 "<span style='font-size:2.8rem; font-weight:900; color:#1e3a8a; line-height: 1.1;'>" + p.getPriorityScore() + "</span>"
             );
 
-            if (p.getPriorityScore() >= 40) {
+            if (p.getPriorityScore() > 100) {
+                priorityBadge.setText("YÖNETİCİ MÜDAHALESİ");
+                priorityBadge.getStyle().set("background", "#f19595").set("color", "#780303");
+            } else if (p.getPriorityScore() >= 60) {
                 priorityBadge.setText("YÜKSEK ÖNCELİKLİ");
                 priorityBadge.getStyle().set("background-color", "#fee2e2").set("color", "#991b1b");
             } else if (p.getPriorityScore() >= 20) {
@@ -224,8 +296,18 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             refreshChatHistoryWindow();
 
         } catch (Exception ex) {
+            scoreContainer.getElement().setProperty("innerHTML",
+                "<span style='font-size:0.75rem; color:#64748b; font-weight:800; margin-bottom: 2px;'>HESAPLANAN SKOR</span>" +
+                "<span style='font-size:2rem; font-weight:900; color:#64748b;'>-</span>"
+            );
+            techScoreContainer.getElement().setProperty("innerHTML",
+                "<span style='font-size:0.75rem; color:#64748b; font-weight:800; margin-bottom: 2px;'>TEKNİK SKOR</span>" +
+                "<span style='font-size:2rem; font-weight:900; color:#64748b;'>-</span>"
+            );
+            priorityBadge.setText("ATANMAMIS");
+            priorityBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+            
             Notification.show("Bu talep henüz atanmadı veya önceliklendirilmedi!").addThemeVariants(NotificationVariant.LUMO_ERROR);
-            UI.getCurrent().navigate("dev/dashboard");
         }
     }
 

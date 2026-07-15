@@ -54,7 +54,7 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     private Long requestId;
     private boolean isUpdatingUi = false;
 
-    private final Span detailsSpan = new Span();
+    private final VerticalLayout detailsCard = new VerticalLayout();
     private final H1 pmScoreDisplay = new H1("0");
     private final H1 techScoreDisplay = new H1("0");
     
@@ -99,8 +99,6 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         leftPanel.setWidth("60%");
         leftPanel.setPadding(false);
 
-        detailsSpan.getStyle().set("display", "block").set("margin-bottom", "20px");
-
         techScoreSelect.setLabel("Temel Mimari Zorluk (Base Tech Score)");
         techScoreSelect.setItems(1, 2, 3, 4, 5);
         techScoreSelect.setValue(1);
@@ -125,7 +123,7 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         developerSelect.setWidthFull();
         developerSelect.setItemLabelGenerator(User::getName);
 
-        leftPanel.add(detailsSpan, techScoreSelect, complexitySelect, effortSelect, smCommentArea, developerSelect);
+        leftPanel.add(detailsCard, techScoreSelect, complexitySelect, effortSelect, smCommentArea, developerSelect);
 
         VerticalLayout rightPanel = new VerticalLayout();
         rightPanel.setWidth("40%");
@@ -258,14 +256,80 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     private void populateViewContent() {
         isUpdatingUi = true;
         Department activeDept = currentPrioritization.getDepartment();
-        String deptNameStr = (activeDept != null) ? activeDept.getName() : "Belirtilmemiş";
+        String deptNameStr = (activeDept != null) ? activeDept.getName() : "Belirtilmemis";
 
-        detailsSpan.getElement().setProperty("innerHTML", 
-            "<h3><b>Talep Başlığı:</b> " + targetRequest.getTitle() + "</h3>" +
-            "<p style='color:#475569;'><b>Açıklama:</b> " + (targetRequest.getDescription() != null ? targetRequest.getDescription() : "-") + "</p>" +
-            "<span style='color:#0369a1; font-weight:bold;'>Sorumlu Departman: " + deptNameStr + "</span>"
-        );
+        detailsCard.setWidthFull();
+        detailsCard.setPadding(true);
+        detailsCard.setSpacing(true);
+        detailsCard.getStyle()
+                .set("background-color", "#ffffff")
+                .set("border", "1px solid #e2e8f0")
+                .set("border-radius", "12px")
+                .set("box-shadow", "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)")
+                .set("margin-bottom", "20px")
+                .set("align-items", "stretch")
+                .set("max-width", "100%")
+                .set("box-sizing", "border-box");
 
+        detailsCard.removeAll();
+
+        H2 titleHeader = new H2(targetRequest.getTitle());
+        titleHeader.getStyle()
+                .set("margin", "0")
+                .set("font-size", "1.4rem")
+                .set("font-weight", "800")
+                .set("color", "#0f172a")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
+
+        VerticalLayout descContainer = new VerticalLayout();
+        descContainer.setPadding(false);
+        descContainer.setSpacing(false);
+        descContainer.getStyle().set("margin-top", "4px");
+
+        Span descLabel = new Span("TALEP ACIKLAMASI");
+        descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
+
+        Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Aciklama belirtilmemis.");
+        descBody.getStyle()
+                .set("font-size", "0.95rem")
+                .set("color", "#334155")
+                .set("white-space", "pre-wrap")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
+        descContainer.add(descLabel, descBody);
+
+        HorizontalLayout badgesRow = new HorizontalLayout();
+        badgesRow.setSpacing(true);
+
+        Span affectedBadge = new Span();
+        affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (targetRequest.getAffectedNo() != null) {
+            affectedBadge.setText(targetRequest.getAffectedNo() + " Etkilenen");
+            affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
+        } else {
+            affectedBadge.setText("Belirtilmemis");
+            affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        }
+
+        Span companyBadge = new Span();
+        companyBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (targetRequest.getCustomer() != null && targetRequest.getCustomer().getCompany() != null) {
+            String companyName = targetRequest.getCustomer().getCompany().getName();
+            double companyScore = targetRequest.getCustomer().getCompany().getCompanyScore();
+            companyBadge.setText(companyName + " (Score: " + companyScore + ")");
+            companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
+        } else {
+            companyBadge.setText("Bireysel Musteri");
+            companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        }
+
+        Span deptBadge = new Span("Departman: " + deptNameStr);
+        deptBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700").set("background-color", "#faf5ff").set("color", "#6b21a8");
+
+        badgesRow.add(affectedBadge, companyBadge, deptBadge);
+        detailsCard.add(titleHeader, descContainer, badgesRow);
+        
         pmScoreDisplay.setText(String.valueOf(currentPrioritization.getPriorityScore()));
 
         if (currentPrioritization.getSmTechnicalScore() != null) {
@@ -283,13 +347,13 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         isUpdatingUi = false;
         refreshChatHistoryWindow();
     }
-
+        
     private void recalculateTechnicalScoreText() {
         int baseTech = techScoreSelect.getValue();
         int complexity = complexitySelect.getValue();
         int effort = effortSelect.getValue();
         
-        int totalTechCalculatedScore = (baseTech + complexity) * effort;
+        int totalTechCalculatedScore = (baseTech + complexity) * effort * 2;
         techScoreDisplay.setText(String.valueOf(totalTechCalculatedScore));
     }
 

@@ -52,6 +52,12 @@ public class WorkflowLogService {
             log.setFileBytes(fileBytes);
         }
 
+        boolean isInternal = true;
+        if (commentText != null && (commentText.contains("[MÜŞTERİYE İADE EDİLDİ]") || (sender != null && "CUSTOMER".equals(sender.getRole().name())))) {
+            isInternal = false;
+        }
+        log.setInternal(isInternal);
+
         workflowLogRepository.save(log);
     }
 }

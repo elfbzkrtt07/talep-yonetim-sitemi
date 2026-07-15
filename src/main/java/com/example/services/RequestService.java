@@ -11,22 +11,32 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.entities.Prioritization;
 import com.example.entities.Request;
 import com.example.entities.User;
+import com.example.enums.RequestStatus;
 import com.example.repositories.PrioritizationRepository;
 import com.example.repositories.RequestRepository;
+import com.example.repositories.WorkflowLogRepository;
+import com.example.repositories.WorkflowRepository;
 
 @Service
 public class RequestService {
 
     private final RequestRepository requestRepository;
     private final PrioritizationRepository prioritizationRepository;
+    private final WorkflowRepository workflowRepository;
+    private final WorkflowLogRepository workflowLogRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @Autowired
-    public RequestService(RequestRepository requestRepository, PrioritizationRepository prioritizationRepository) {
+    public RequestService(RequestRepository requestRepository, 
+                          PrioritizationRepository prioritizationRepository,
+                          WorkflowRepository workflowRepository,
+                          WorkflowLogRepository workflowLogRepository) {
         this.requestRepository = requestRepository;
         this.prioritizationRepository = prioritizationRepository;
+        this.workflowRepository = workflowRepository;
+        this.workflowLogRepository = workflowLogRepository;
     }
 
     @Transactional
@@ -34,7 +44,7 @@ public class RequestService {
         return requestRepository.save(request);
     }
 
-    @Transactional
+   @Transactional
     public Request updateRequest(Request request) {
         Request existingRequest = requestRepository.findById(request.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Request not found with id: " + request.getId()));
@@ -42,7 +52,8 @@ public class RequestService {
         existingRequest.setAffectedNo(request.getAffectedNo());
         existingRequest.setDescription(request.getDescription());
         existingRequest.setTitle(request.getTitle());
-        existingRequest.setStatus(request.getStatus()); 
+        
+        existingRequest.setStatus(com.example.enums.RequestStatus.PENDING); 
         existingRequest.setUpdatedAt(java.time.LocalDateTime.now());
 
         return requestRepository.save(existingRequest);
@@ -50,6 +61,15 @@ public class RequestService {
 
     @Transactional
     public void deleteRequest(Request request) {
+        if (request == null) {
+            return;
+        }
+        
+        Long requestId = request.getId();
+
+        workflowLogRepository.deleteByRequestId(requestId);
+        workflowRepository.deleteByRequestId(requestId);
+        prioritizationRepository.deleteByRequestId(requestId);
         requestRepository.delete(request);
     }
 
@@ -105,5 +125,16 @@ public class RequestService {
 
     public List<Request> getAllRequests() {
         return requestRepository.findAllWithCustomerAndCompany();
+    }
+
+    @Transactional
+    public Request updateRequestStatus(Long requestId, RequestStatus newStatus) {
+        Request existingRequest = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found with id: " + requestId));
+        
+        existingRequest.setStatus(newStatus);
+        existingRequest.setUpdatedAt(java.time.LocalDateTime.now());
+        
+        return requestRepository.save(existingRequest);
     }
 }
