@@ -81,7 +81,6 @@ public class MainLayout extends AppLayout {
         menuContainer.setSpacing(true);
         menuContainer.setPadding(true);
 
-        // 1. Fetch the logged-in user context dynamically
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
 
         if (currentUser == null || currentUser.getRole() == null) {
@@ -96,7 +95,6 @@ public class MainLayout extends AppLayout {
 
             case CUSTOMER:
                 RouterLink customerDash = new RouterLink("Taleplerim", CustomerDashboardView.class);
-                
                 RouterLink newRequestShortcut = new RouterLink("Yeni Talep Aç", CustomerDashboardView.class);
                 newRequestShortcut.setQueryParameters(com.vaadin.flow.router.QueryParameters.simple(java.util.Map.of("action", "new")));
                 
@@ -111,21 +109,25 @@ public class MainLayout extends AppLayout {
                 RouterLink pmRequests = new RouterLink("Gelen Talepler", com.example.views.pm.PMRequestsView.class); 
                 RouterLink pmPriorities = new RouterLink("Öncelik Havuzu", com.example.views.pm.PMPrioritizationsView.class);
                 RouterLink pmWorkflows = new RouterLink("İş Akışları", com.example.views.pm.PMWorkflowsView.class);
+                RouterLink pmSentBack = new RouterLink("Geri Gönderilenler", com.example.views.pm.PMSentBackView.class);
                 // RouterLink pmAnalytics = new RouterLink("Analitik Raporlar", com.example.views.pm.PMAnalyticsView.class);
                 
-                menuContainer.add(pmHome, pmRequests, pmPriorities, pmWorkflows/*, pmAnalytics);*/ );
+                menuContainer.add(pmHome, pmRequests, pmPriorities, pmWorkflows, pmSentBack/*, pmAnalytics);*/ );
                 break;
 
             case DEVELOPER:
                 RouterLink devTasks = new RouterLink("Bana Atanan İşler", com.example.views.developer.DeveloperDashboardView.class);
-                
-                menuContainer.add(devTasks);
+                RouterLink devCompleted = new RouterLink("Tamamlanan İşler", com.example.views.developer.DeveloperCompletedView.class);
+                menuContainer.add(devTasks, devCompleted);
                 break;
 
             case SOFTWARE_MANAGER:
+                RouterLink smHome = new RouterLink("Ana Sayfa", com.example.views.sm.SMDashboardView.class);
                 RouterLink smInbox = new RouterLink("Departmana Atanan İşler", com.example.views.sm.SMRequestsView.class);
-                
-                menuContainer.add(smInbox/* , smAnalytics*/);
+                RouterLink smSentBack = new RouterLink("Geri Gönderilen İş Akışları", com.example.views.sm.SMSentBackView.class);
+                RouterLink smDeptHistory = new RouterLink("Departman İş Geçmişi", com.example.views.sm.SMJobHistoryView.class);
+                RouterLink smDevMonitor = new RouterLink("Ekip Yönetimi", com.example.views.sm.SMDeveloperMonitorView.class);
+                menuContainer.add(smHome, smInbox, smSentBack, smDeptHistory, smDevMonitor/* , smAnalytics*/);
                 break;
 
             default:

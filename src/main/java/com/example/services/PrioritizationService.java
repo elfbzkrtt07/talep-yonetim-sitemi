@@ -175,8 +175,13 @@ public class PrioritizationService {
     }
 
     @Transactional
-    public void completeDeveloperJob(Long requestId) {
-        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, null, WorkflowStatus.COMPLETED);
+    public void completeDeveloperJob(Long requestId, User currentDev) {
+        prioritizationRepository.updateWorkflowAssigneeAndStatus(requestId, currentDev, WorkflowStatus.COMPLETED);
+
+        requestRepository.findById(requestId).ifPresent(request -> {
+            request.setStatus(com.example.enums.RequestStatus.COMPLETED);
+            requestRepository.save(request);
+        });
     }
 
     @Transactional

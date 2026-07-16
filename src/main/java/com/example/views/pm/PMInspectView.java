@@ -5,14 +5,17 @@ import com.example.entities.Department;
 import com.example.entities.Prioritization;
 import com.example.entities.Request;
 import com.example.entities.User;
+import com.example.entities.Workflow;
 import com.example.entities.WorkflowLog;
 import com.example.enums.RequestStatus;
 import com.example.enums.TaskType;
 import com.example.repositories.DepartmentRepository;
 import com.example.repositories.WorkflowLogRepository;
+import com.example.repositories.WorkflowRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
+import com.example.services.WorkflowService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -53,6 +56,7 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     private final DepartmentRepository departmentRepository;
     private final WorkflowLogService workflowLogService;
     private final WorkflowLogRepository workflowLogRepository;
+    private final WorkflowService workflowService;
     
     private Request targetRequest;
     private Long requestId;
@@ -67,6 +71,9 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     
     private final H1 scoreValue = new H1("0");
     private final Span priorityBadge = new Span("DÜŞÜK ÖNCELİKLİ");
+    
+    private final VerticalLayout techScoreLayout = new VerticalLayout();
+    private final H1 techScoreValue = new H1("-");
 
     private final Tabs chatTabs = new Tabs();
     private final Tab customerTab = new Tab("Müşteri İletişimi");
@@ -84,12 +91,14 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                          PrioritizationService prioritizationService,
                          DepartmentRepository departmentRepository,
                          WorkflowLogService workflowLogService,
-                         WorkflowLogRepository workflowLogRepository) {
+                         WorkflowLogRepository workflowLogRepository,
+                         WorkflowService workflowService) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.departmentRepository = departmentRepository;
         this.workflowLogService = workflowLogService;
         this.workflowLogRepository = workflowLogRepository;
+        this.workflowService = workflowService;
 
         setSizeFull();
         setPadding(true);
@@ -178,8 +187,17 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
 
         scoreValLayout.add(scoreHeader, interactiveScoreRow);
 
+        techScoreLayout.setPadding(false);
+        techScoreLayout.setSpacing(false);
+        techScoreLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        Span techScoreHeader = new Span("TEKNİK ZORLUK SKORU");
+        techScoreHeader.getStyle().set("font-size", "0.75rem").set("color", "#d97706").set("font-weight", "bold");
+        techScoreValue.getStyle().set("margin", "0").set("font-size", "3rem").set("font-weight", "bold").set("color", "#d97706");
+        techScoreLayout.add(techScoreHeader, techScoreValue);
+        techScoreLayout.setVisible(false);
+
         priorityBadge.getStyle().set("padding", "8px 16px").set("border-radius", "20px").set("font-weight", "bold").set("font-size", "0.85rem");
-        scoreBox.add(scoreValLayout, priorityBadge);
+        scoreBox.add(scoreValLayout, techScoreLayout, priorityBadge);
 
         chatTabs.add(customerTab, internalTab);
         chatTabs.setWidthFull();
@@ -348,20 +366,23 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
             
             try {
                 Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
-                
-                impactSelect.setValue(existingPrior.getImpact());
                 urgencySelect.setValue(existingPrior.getUrgency());
                 typeSelect.setValue(existingPrior.getTaskType());
                 departmentField.setValue(existingPrior.getDepartment());
                 
                 updateScoreBadgeVisuals(existingPrior.getPriorityScore());
                 hasExistingPrioritization = true;
+                if (existingPrior.getSmTechnicalScore() != null) {
+                    techScoreValue.setText(String.valueOf(existingPrior.getSmTechnicalScore()));
+                    techScoreLayout.setVisible(true);
+                }
                 
             } catch (Exception ex) {
                 impactSelect.setValue(1);
                 urgencySelect.setValue(1);
                 if (TaskType.values().length > 0) typeSelect.setValue(TaskType.values()[0]);
                 departmentField.setValue(null);
+                techScoreLayout.setVisible(false);
             } finally {
                 isUpdatingUi = false;
                 
@@ -543,12 +564,16 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
         UI.getCurrent().navigate("pm/requests");
     }
 
+    private void setHighestPriority() {
+        updateScoreBadgeVisuals(1000);
+    }
+
     private void openRejectReasonDialog() {
         Dialog rejectDialog = new Dialog();
-        rejectDialog.setHeaderTitle("Müşteriye İade Gerekçesi");
+        rejectDialog.setHeaderTitle("Müşteri/Ekip İade Gerekçesi");
 
         TextArea feedbackArea = new TextArea("Revizyon / Eksik Bilgi Notu");
-        feedbackArea.setPlaceholder("Lütfen müşterinin neyi düzeltmesi gerektiğini detaylıca yazın...");
+        feedbackArea.setPlaceholder("Lütfen düzeltilmesi gereken detayları buraya yazın...");
         feedbackArea.setWidth("400px");
         feedbackArea.setHeight("120px");
         rejectDialog.add(feedbackArea);
@@ -566,20 +591,24 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 workflowLogService.saveChatComment(requestId, "[MÜŞTERİYE İADE EDİLDİ]: Gerekçe: " + note, currentUser, null, null);
             }
 
-            Department chosenDept = departmentField.getValue();
-            int currentManualScore = Integer.parseInt(scoreValue.getText());
-            
-            Prioritization tempPrioritization = new Prioritization(
-                    targetRequest,
-                    urgencySelect.getValue(),
-                    impactSelect.getValue(),
-                    typeSelect.getValue(),
-                    chosenDept,
-                    currentManualScore
-            );
-            
-            requestService.approveAndPrioritizeRequest(targetRequest, tempPrioritization);
             requestService.updateRequestStatus(targetRequest.getId(), RequestStatus.SENT_BACK);
+
+            try {
+                Workflow wf = workflowService.getWorkflowByRequestId(requestId);
+                
+                if (wf == null) {
+                    wf = new Workflow();
+                    wf.setworkflowId(requestId);
+                    wf.setRequest(targetRequest);
+                    wf.setCreatedAt(java.time.LocalDateTime.now());
+                }
+                
+                wf.setStatus(com.example.enums.WorkflowStatus.REVISION_REQUIRED);
+                wf.setCurrentAssignee(null);
+                workflowService.updateDevStatus(requestId, com.example.enums.WorkflowStatus.REVISION_REQUIRED, "Müşteri Revizyonu", null);
+                
+            } catch (Exception ex) {
+            }
 
             Notification.show("Talep müşteriye geri gönderildi.").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             
@@ -590,9 +619,5 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
 
         rejectDialog.getFooter().add(new Button("İptal", c -> rejectDialog.close()), submitReject);
         rejectDialog.open();
-    }
-
-    private void setHighestPriority() {
-        updateScoreBadgeVisuals(1000);
     }
 }

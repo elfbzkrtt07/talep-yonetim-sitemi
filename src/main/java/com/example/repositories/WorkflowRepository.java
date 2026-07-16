@@ -35,4 +35,25 @@ public interface WorkflowRepository extends JpaRepository<Workflow, Long> {
     @Modifying
     @Query("DELETE FROM Workflow w WHERE w.request.id = :requestId")
     void deleteByRequestId(@Param("requestId") Long requestId);
+
+    @Query("SELECT w FROM Workflow w " +
+            "JOIN FETCH w.request r " +
+            "JOIN FETCH r.customer c " +
+            "WHERE w.currentAssignee = :developer " +
+            "AND w.status = com.example.enums.WorkflowStatus.COMPLETED")
+        List<Workflow> findCompletedJobsByDeveloper(@Param("developer") User developer);
+
+    @Query("SELECT w FROM Workflow w " +
+           "JOIN FETCH w.request r " +
+           "LEFT JOIN FETCH r.customer c " +
+           "WHERE w.status = com.example.enums.WorkflowStatus.SENT_BACK_TO_SM")
+    List<Workflow> findRequestsSentBackToSM();
+
+    @Query("SELECT w FROM Workflow w " +
+           "JOIN FETCH w.request r " +
+           "LEFT JOIN FETCH r.customer c " +
+           "WHERE w.status = com.example.enums.WorkflowStatus.SENT_BACK_TO_PM")
+    List<Workflow> findRequestsSentBackToPM();
+
+    
 }

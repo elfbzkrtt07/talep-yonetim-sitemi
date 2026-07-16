@@ -30,16 +30,16 @@ public class PMRequestsView extends VerticalLayout implements BeforeEnterObserve
         setPadding(true);
         getStyle().set("background-color", "#f8fafc");
 
-        H2 title = new H2("Gelen Talepler");
-        title.getStyle().set("margin", "10px var(--lumo-space-m) 5px var(--lumo-space-m)");
+        VerticalLayout headerBanner = createHeaderBanner("Gelen Talepler");
         
         Paragraph desc = new Paragraph("Gözden geçirilip öncelik havuzuna veya iş akışına aktarılması beklenen talepler.");
-        desc.getStyle().set("color", "#64748b").set("margin", "0 var(--lumo-space-m) 20px var(--lumo-space-m)");
+        desc.getStyle()
+                .set("color", "#64748b")
+                .set("text-align", "center")
+                .set("margin", "0 auto 25px auto");
 
-        // Grid Column Definitions
         requestGrid.addColumn(Request::getId).setHeader("ID").setWidth("80px").setFlexGrow(0);
         
-        // 🌟 Safeguarded Column Renderer targeting eagerly loaded user entities
         requestGrid.addColumn(request -> {
             if (request.getCustomer() != null) {
                 return request.getCustomer().getName();
@@ -55,7 +55,6 @@ public class PMRequestsView extends VerticalLayout implements BeforeEnterObserve
             Button inspectBtn = new Button("İncele", VaadinIcon.SEARCH.create());
             inspectBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
             inspectBtn.addClickListener(e -> {
-                // Navigate directly to your dedicated PMInspectView passing the target request ID
                 getUI().ifPresent(ui -> ui.navigate("pm/inspect/" + request.getId()));
             });
             return inspectBtn;
@@ -64,15 +63,36 @@ public class PMRequestsView extends VerticalLayout implements BeforeEnterObserve
         requestGrid.setWidth("calc(100% - 40px)");
         requestGrid.getStyle().set("margin", "0 auto");
 
-        add(title, desc, requestGrid);
+        add(headerBanner, desc, requestGrid);
     }
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        // Filters only PENDING entries awaiting assessment
         List<Request> pendingList = requestService.getAllRequests().stream()
                 .filter(r -> r.getStatus() == RequestStatus.PENDING)
                 .toList();
         requestGrid.setItems(pendingList);
+    }
+
+    private VerticalLayout createHeaderBanner(String titleText) {
+        VerticalLayout bannerLayout = new VerticalLayout();
+        bannerLayout.setWidthFull();
+        bannerLayout.setAlignItems(Alignment.CENTER); 
+        bannerLayout.setJustifyContentMode(JustifyContentMode.CENTER);
+        bannerLayout.setPadding(false);
+        bannerLayout.getStyle()
+                .set("margin-top", "25px")
+                .set("margin-bottom", "10px");
+
+        H2 title = new H2(titleText);
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "2.5rem") 
+                .set("font-weight", "1000") 
+                .set("color", "#0f172a")
+                .set("text-align", "center");
+
+        bannerLayout.add(title);
+        return bannerLayout;
     }
 }

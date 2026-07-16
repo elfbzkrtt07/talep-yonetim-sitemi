@@ -62,6 +62,9 @@ public class Workflow {
     public WorkflowStatus getStatus() { return status; }
     public void setStatus(WorkflowStatus status) { this.status = status; }
     
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public java.time.LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(java.time.LocalDateTime time) { this.createdAt = time; }
+
+    public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(java.time.LocalDateTime time) { this.updatedAt = time; }
 }

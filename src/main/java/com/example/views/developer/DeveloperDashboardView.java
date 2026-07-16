@@ -12,6 +12,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -34,10 +35,11 @@ public class DeveloperDashboardView extends VerticalLayout {
         setPadding(true);
         getStyle().set("background-color", "#f8fafc");
 
-        H2 welcomeHeading = new H2("Hoşgeldiniz");
-        Paragraph subtitle = new Paragraph("Ürün sorumlusu tarafından size atanan müşteri talepleri talep skoruna göre sıralanmıştır.");
-        subtitle.getStyle().set("color", "#64748b");
-        add(welcomeHeading, subtitle);
+        VerticalLayout headerBanner = createHeaderBanner(
+                "Hoşgeldiniz", 
+                "Ürün sorumlusu tarafından size atanan müşteri talepleri talep skoruna göre sıralanmıştır."
+        );
+        add(headerBanner);
 
         taskGrid.addColumn(w -> w.getRequest().getId()).setHeader("ID").setAutoWidth(true);
         taskGrid.addColumn(w -> w.getRequest().getCustomer().getName()).setHeader("Müşteri").setAutoWidth(true);
@@ -70,5 +72,38 @@ public class DeveloperDashboardView extends VerticalLayout {
         } else {
             Notification.show("Oturum açmış kullanıcı bulunamadı!").addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
+    }
+
+    private VerticalLayout createHeaderBanner(String titleText, String subtitleText) {
+        VerticalLayout bannerLayout = new VerticalLayout();
+        bannerLayout.setWidthFull();
+        bannerLayout.setAlignItems(Alignment.CENTER); 
+        bannerLayout.setJustifyContentMode(JustifyContentMode.CENTER);
+        bannerLayout.setPadding(false);
+        bannerLayout.setSpacing(true);
+        bannerLayout.getStyle()
+                .set("margin-top", "25px")
+                .set("margin-bottom", "15px");
+
+        H2 title = new H2(titleText);
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "2.5rem") 
+                .set("font-weight", "1000") 
+                .set("color", "#0f172a")
+                .set("text-align", "center");
+        bannerLayout.add(title);
+
+        if (subtitleText != null && !subtitleText.isEmpty()) {
+            Span subtitle = new Span(subtitleText);
+            subtitle.getStyle()
+                    .set("margin-top", "8px") 
+                    .set("font-size", "0.9rem")
+                    .set("color", "#64748b")
+                    .set("text-align", "center");
+            bannerLayout.add(subtitle);
+        }
+
+        return bannerLayout;
     }
 }

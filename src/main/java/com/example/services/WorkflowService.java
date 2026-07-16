@@ -1,28 +1,38 @@
 package com.example.services;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import com.example.entities.Workflow;
 import com.example.entities.Request;
 import com.example.entities.User;
+import com.example.entities.Prioritization;
 import com.example.enums.WorkflowStatus;
 import com.example.repositories.WorkflowRepository;
 import com.example.repositories.RequestRepository;
+import com.example.repositories.PrioritizationRepository;
 
 @Service
 public class WorkflowService {
 
     private final WorkflowRepository workflowRepository;
     private final RequestRepository requestRepository;
+    private final PrioritizationRepository prioritizationRepository;
     private final PrioritizationService prioritizationService;
     private final WorkflowLogService workflowLogService;
     private final IllegalArgumentException requestNotFound = new IllegalArgumentException("Request Not Found");
 
-    public WorkflowService(WorkflowRepository workflowRepository, RequestRepository requestRepository, 
-                           PrioritizationService prioritizationService, WorkflowLogService workflowLogService) {
+    public WorkflowService(WorkflowRepository workflowRepository, 
+                           RequestRepository requestRepository, 
+                           PrioritizationRepository prioritizationRepository, 
+                           PrioritizationService prioritizationService, 
+                           WorkflowLogService workflowLogService) {
         this.workflowRepository = workflowRepository;
         this.requestRepository = requestRepository;
+        this.prioritizationRepository = prioritizationRepository;
         this.prioritizationService = prioritizationService;
         this.workflowLogService = workflowLogService;
     }
@@ -78,10 +88,72 @@ public class WorkflowService {
                 .orElseThrow(() -> requestNotFound);
 
         Workflow workflow = workflowRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("No active workflow record found"));
+                .orElseGet(() -> {
+                    Workflow newWf = new Workflow();
+                    newWf.setworkflowId(requestId);
+                    newWf.setRequest(request);
+                    newWf.setCreatedAt(java.time.LocalDateTime.now());
+                    return newWf;
+                });
 
         workflow.setStatus(nextStatus);
+        workflow.setCurrentAssignee(developer); // null ise temizler, atanmışsa günceller
         workflowRepository.save(workflow);
 
+        if (nextStatus == WorkflowStatus.COMPLETED) {
+            request.setStatus(com.example.enums.RequestStatus.COMPLETED); 
+            requestRepository.save(request);
+        }
+    }
+
+    public List<Workflow> getCompletedJobsForDeveloper(User developer) {
+        if (developer == null) {
+            return java.util.Collections.emptyList();
+        }
+        return workflowRepository.findCompletedJobsByDeveloper(developer);
+    }
+
+    public Workflow getWorkflowByRequestId(Long requestId) {
+        return workflowRepository.findById(requestId).orElse(null);
+    }
+
+    public List<Workflow> getAllWorkflows() {
+        return workflowRepository.findAll();
+    }
+
+    public List<Workflow> getSentBackRequestsForPM(User currentUser) {
+        return workflowRepository.findRequestsSentBackToPM();
+    }
+
+    public List<Workflow> getSentBackRequestsForSM(User currentUser) {
+        // 1. Yazılımcıların SM'e geri fırlattığı işleri repository'den çekiyoruz (SENT_BACK_TO_SM)
+        List<Workflow> sentBackToSM = workflowRepository.findRequestsSentBackToSM();
+
+        // 2. SM'in PM'e geri pasladığı işleri repository'den çekiyoruz (SENT_BACK_TO_PM)
+        List<Workflow> sentBackToPM = workflowRepository.findRequestsSentBackToPM();
+
+        // 3. İki listeyi tek bir ArrayList içinde güvenle birleştiriyoruz
+        List<Workflow> allSentBack = new ArrayList<>();
+        allSentBack.addAll(sentBackToSM);
+        allSentBack.addAll(sentBackToPM);
+
+        // 4. Sadece bu SM'in departmanına ait olan talepleri süzüp dönüyoruz
+        if (currentUser != null && currentUser.getDepartment() != null) {
+            Long deptId = currentUser.getDepartment().getId();
+            
+            return allSentBack.stream()
+                .filter(w -> {
+                    if (w.getRequest() == null) return false;
+                    
+                    // Doğrudan repository üzerinden JPA tablosuna erişerek departman kontrolünü güvenceye alıyoruz
+                    Prioritization prio = prioritizationRepository.findById(w.getRequest().getId()).orElse(null);
+                    return prio != null && 
+                           prio.getDepartment() != null && 
+                           prio.getDepartment().getId().equals(deptId);
+                })
+                .toList();
+        }
+
+        return allSentBack;
     }
 }

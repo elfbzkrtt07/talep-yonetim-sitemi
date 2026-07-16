@@ -89,6 +89,8 @@ public class Request {
     public void setStatus(RequestStatus status) { this.status = status; }
 
     public java.time.LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(java.time.LocalDateTime time) { this.createdAt = time; }
+
     public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.time.LocalDateTime time) { this.updatedAt = time; }
 

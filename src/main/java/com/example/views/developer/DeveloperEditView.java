@@ -4,7 +4,9 @@ import com.example.base.ui.MainLayout;
 import com.example.entities.Prioritization;
 import com.example.entities.Request;
 import com.example.entities.User;
+import com.example.entities.Workflow;
 import com.example.entities.WorkflowLog;
+import com.example.enums.WorkflowStatus; 
 import com.example.repositories.WorkflowLogRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
@@ -71,6 +73,8 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     private byte[] uploadedFileBytes = null;
     
     private final Button sendChatBtn;
+    
+    private final VerticalLayout btnColumn = new VerticalLayout();
 
     public DeveloperEditView(PrioritizationService prioritizationService, 
                              WorkflowService workflowService, 
@@ -194,7 +198,6 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             refreshChatHistoryWindow();
         });
 
-        VerticalLayout btnColumn = new VerticalLayout();
         btnColumn.setWidthFull();
         btnColumn.setSpacing(true);
         btnColumn.setPadding(false);
@@ -340,6 +343,13 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             );
             refreshChatHistoryWindow();
 
+            Workflow wf = workflowService.getWorkflowByRequestId(requestId);
+            if (wf != null && wf.getStatus() == WorkflowStatus.COMPLETED) {
+                btnColumn.setVisible(false);
+                fileUpload.setVisible(false);
+                sendChatBtn.setVisible(false);
+            }
+
         } catch (Exception ex) {
             scoreContainer.getElement().setProperty("innerHTML",
                 "<span style='font-size:0.75rem; color:#64748b; font-weight:800; margin-bottom: 2px;'>HESAPLANAN SKOR</span>" +
@@ -470,7 +480,7 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             workflowLogService.saveChatComment(requestId, "[İŞ TAMAMLANDI]: " + msg, currentUser, null, null);
         }
 
-        prioritizationService.completeDeveloperJob(requestId);
+        prioritizationService.completeDeveloperJob(requestId, currentUser);
         Notification.show("İş başarıyla tamamlandı!").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         UI.getCurrent().navigate("dev/dashboard");
     }

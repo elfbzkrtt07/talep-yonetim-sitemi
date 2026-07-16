@@ -34,7 +34,6 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
     private final Paragraph registerSub = new Paragraph("Sisteme dahil olmak için formu doldurun.");
 
     private final Select<UserRole> roleSelect = new Select<>();
-    private final Select<Department> departmentSelect = new Select<>();
 
     public LoginView(UserService userService, DepartmentService departmentService) {
         this.userService = userService;
@@ -93,24 +92,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                     if (user.isApproved()) {
                         Notification.show("Giriş Başarılı!").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                         com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("user", user);
-                        
-                        switch (user.getRole()) {
-                            case CUSTOMER:
-                                UI.getCurrent().navigate("customer/dashboard");
-                                break;
-                            case DEVELOPER:
-                                UI.getCurrent().navigate("dev/dashboard");
-                                break;
-                            case SOFTWARE_MANAGER:
-                                UI.getCurrent().navigate("sm/requests");
-                                break;
-                            case PRODUCT_MANAGER:
-                                UI.getCurrent().navigate("pm/requests");
-                                break;
-                            default:
-                                Notification.show("Rol segmenti tanımlanamadı!").addThemeVariants(NotificationVariant.LUMO_ERROR);
-                                break;
-                        }
+                        UI.getCurrent().navigate(user.getRole().getUrlSegment() + "/dashboard");
                     } else {
                         this.removeAll();
                         this.add(new WaitingApprovalView(user.getName(), user.getRole().name().toLowerCase()));
@@ -139,7 +121,6 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
         roleSelect.addValueChangeListener(e -> {
             UserRole selected = e.getValue();
-            departmentSelect.setVisible(selected == UserRole.DEVELOPER || selected == UserRole.SOFTWARE_MANAGER);
         });
 
         TextField regName = new TextField("Tam İsim");
@@ -150,12 +131,6 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
         PasswordField regPass = new PasswordField("Şifre");
         styleInputField(regPass, VaadinIcon.PASSWORD);
-
-        departmentSelect.setLabel("Departman Seçin");
-        departmentSelect.setItemLabelGenerator(d -> d.getName() != null ? d.getName().trim() : "Departman #" + d.getId());
-        departmentSelect.setItems(departmentService.getAllDepartments());
-        departmentSelect.setVisible(false);
-        styleSelectorField(departmentSelect, VaadinIcon.BRIEFCASE);
 
         roleSelect.setValue(UserRole.CUSTOMER); 
 
@@ -176,23 +151,19 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
                 UserRole targetRole = roleSelect.getValue();
 
-                if (targetRole == UserRole.DEVELOPER || targetRole == UserRole.SOFTWARE_MANAGER) {
-                    newUser.setDepartment(departmentSelect.getValue());
-                }
-
                 userService.registerNewUser(newUser, targetRole);
                 
                 Notification n = Notification.show("Kayıt Alındı! Onay bekleniyor.");
                 n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 
                 regName.clear(); regEmail.clear(); regPass.clear();
-                roleSelect.setValue(UserRole.CUSTOMER); departmentSelect.clear();
+                roleSelect.setValue(UserRole.CUSTOMER); 
             } catch (Exception e) {
                 Notification.show("Hata: " + e.getMessage()).addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
 
-        rightPanel.add(registerTitle, registerSub, roleSelect, regName, regEmail, regPass, departmentSelect, registerBtn);
+        rightPanel.add(registerTitle, registerSub, roleSelect, regName, regEmail, regPass, registerBtn);
         masterPanel.add(leftPanel, rightPanel);
         add(logo, masterPanel);
     }

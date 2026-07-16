@@ -68,21 +68,31 @@ public class WorkflowLog {
     }
 
     public Long getId() { return id; }
+    
     public Request getRequest() { return request; }
     public void setRequest(Request request) { this.request = request; }
+
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
     public String getLogText() { return logText; }
     public void setLogText(String logText) { this.logText = logText; }
+
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
+
     public byte[] getFileBytes() { return fileBytes; }
     public void setFileBytes(byte[] fileBytes) { this.fileBytes = fileBytes; }
+
     public String getFromStatus() { return fromStatus; }
     public void setFromStatus(String fromStatus) { this.fromStatus = fromStatus; }
+
     public String getToStatus() { return toStatus; }
     public void setToStatus(String toStatus) { this.toStatus = toStatus; }
+
     public boolean isInternal() { return isInternal; }
     public void setInternal(boolean isInternal) { this.isInternal = isInternal; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(java.time.LocalDateTime time) { this.createdAt = time; }
 }

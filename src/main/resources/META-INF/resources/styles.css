@@ -27,3 +27,23 @@ vaadin-side-nav:has(vaadin-side-nav-item:only-child)::after {
     min-width: 100%;
     white-space: normal;
 }
+
+vaadin-grid::part(row-completed) {
+    background-color: #f0fdf4 !important;
+    color: #14532d;
+}
+
+vaadin-grid::part(row-sent-back-pm) {
+    background-color: #fef2f2 !important;
+    color: #991b1b;
+}
+
+vaadin-grid::part(row-sent-back-sm) {
+    background-color: #fff7ed !important;
+    color: #9a3412;
+}
+
+vaadin-grid::part(row-development) {
+    background-color: #f0f9ff !important;
+    color: #0369a1;
+}
