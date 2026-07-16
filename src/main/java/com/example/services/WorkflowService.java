@@ -97,7 +97,7 @@ public class WorkflowService {
                 });
 
         workflow.setStatus(nextStatus);
-        workflow.setCurrentAssignee(developer); // null ise temizler, atanmışsa günceller
+        workflow.setCurrentAssignee(developer);
         workflowRepository.save(workflow);
 
         if (nextStatus == WorkflowStatus.COMPLETED) {
@@ -126,26 +126,20 @@ public class WorkflowService {
     }
 
     public List<Workflow> getSentBackRequestsForSM(User currentUser) {
-        // 1. Yazılımcıların SM'e geri fırlattığı işleri repository'den çekiyoruz (SENT_BACK_TO_SM)
         List<Workflow> sentBackToSM = workflowRepository.findRequestsSentBackToSM();
 
-        // 2. SM'in PM'e geri pasladığı işleri repository'den çekiyoruz (SENT_BACK_TO_PM)
         List<Workflow> sentBackToPM = workflowRepository.findRequestsSentBackToPM();
 
-        // 3. İki listeyi tek bir ArrayList içinde güvenle birleştiriyoruz
         List<Workflow> allSentBack = new ArrayList<>();
         allSentBack.addAll(sentBackToSM);
         allSentBack.addAll(sentBackToPM);
 
-        // 4. Sadece bu SM'in departmanına ait olan talepleri süzüp dönüyoruz
         if (currentUser != null && currentUser.getDepartment() != null) {
             Long deptId = currentUser.getDepartment().getId();
             
             return allSentBack.stream()
                 .filter(w -> {
                     if (w.getRequest() == null) return false;
-                    
-                    // Doğrudan repository üzerinden JPA tablosuna erişerek departman kontrolünü güvenceye alıyoruz
                     Prioritization prio = prioritizationRepository.findById(w.getRequest().getId()).orElse(null);
                     return prio != null && 
                            prio.getDepartment() != null && 
