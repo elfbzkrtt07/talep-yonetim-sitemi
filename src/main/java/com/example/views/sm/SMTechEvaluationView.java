@@ -7,6 +7,7 @@ import com.example.entities.Request;
 import com.example.entities.User;
 import com.example.entities.WorkflowLog;
 import com.example.repositories.UserRepository;
+import com.example.repositories.WorkflowLogRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
@@ -27,6 +28,8 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
@@ -48,11 +51,13 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     private final UserRepository userRepository;
     private final WorkflowService workflowService;
     private final WorkflowLogService workflowLogService;
+    private final WorkflowLogRepository workflowLogRepository;
 
     private Request targetRequest;
     private Prioritization currentPrioritization;
     private Long requestId;
     private boolean isUpdatingUi = false;
+    private boolean showingInternalTab = false;
 
     private final VerticalLayout detailsCard = new VerticalLayout();
     private final H1 pmScoreDisplay = new H1("0");
@@ -65,23 +70,31 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     private final TextArea smCommentArea = new TextArea("Teknik Değerlendirme / Notlar");
     private final Select<User> developerSelect = new Select<>();
 
+    private final Tabs chatTabs = new Tabs();
+    private final Tab customerTab = new Tab("Müşteri İletişimi");
+    private final Tab internalTab = new Tab("İç Değerlendirme");
+
     private final VerticalLayout chatHistoryArea = new VerticalLayout();
     private final TextArea chatInputArea = new TextArea("Mesaj");
     private final Upload fileUpload;
     private final MemoryBuffer fileBuffer = new MemoryBuffer();
     private String uploadedFileName = null;
     private byte[] uploadedFileBytes = null;
+    
+    private final Button sendChatBtn;
 
     public SMTechEvaluationView(RequestService requestService, 
                                 PrioritizationService prioritizationService,
                                 UserRepository userRepository,
                                 WorkflowService workflowService,
-                                WorkflowLogService workflowLogService) {
+                                WorkflowLogService workflowLogService,
+                                WorkflowLogRepository workflowLogRepository) {
         this.requestService = requestService;
         this.prioritizationService = prioritizationService;
         this.userRepository = userRepository;
         this.workflowService = workflowService;
         this.workflowLogService = workflowLogService;
+        this.workflowLogRepository = workflowLogRepository;
 
         setSizeFull();
         setPadding(true);
@@ -173,19 +186,20 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         
         metricCardRow.add(pmCard, techCard);
 
-        chatHistoryArea.setWidthFull();
-        chatHistoryArea.setHeight("200px");
-        chatHistoryArea.getStyle()
-                .set("overflow-y", "auto")
-                .set("background", "#ffffff")
-                .set("border", "1px solid #cbd5e1")
-                .set("border-radius", "8px")
-                .set("padding", "12px");
+        sendChatBtn = new Button("Mesaj Gönder", e -> submitSmChatMessage());
+        sendChatBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        sendChatBtn.setWidthFull();
+        sendChatBtn.getStyle().set("margin-bottom", "10px");
 
-        chatInputArea.setPlaceholder("Ekiple paylaşmak için bir şeyler yazın...");
-        chatInputArea.setWidthFull();
-        chatInputArea.setHeight("60px");
-        chatInputArea.getStyle().set("margin-bottom", "5px");
+        Button submitBtn = new Button("TEKNİK ANALİZİ TAMAMLA", VaadinIcon.PAPERPLANE.create());
+        submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
+        submitBtn.setWidthFull();
+        submitBtn.addClickListener(e -> saveTechnicalEvaluationData());
+
+        Button returnBtn = new Button("Ürün Yöneticisine Geri Gönder", VaadinIcon.RECYCLE.create());
+        returnBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
+        returnBtn.setWidthFull();
+        returnBtn.addClickListener(e -> sendWorkflowBackToProductManager());
 
         fileUpload = new Upload(fileBuffer);
         fileUpload.setMaxFiles(1);
@@ -201,25 +215,44 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
             }
         });
 
-        Button sendChatBtn = new Button("Mesaj Gönder", e -> submitSmChatMessage());
-        sendChatBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        sendChatBtn.setWidthFull();
-        sendChatBtn.getStyle().set("margin-bottom", "10px");
+        chatTabs.add(customerTab, internalTab);
+        chatTabs.setWidthFull();
+        chatTabs.addSelectedChangeListener(event -> {
+            showingInternalTab = event.getSelectedTab().equals(internalTab);
+            
+            if (showingInternalTab) {
+                chatInputArea.setReadOnly(false);
+                chatInputArea.setPlaceholder("Ekiple paylaşmak için bir şeyler yazın...");
+                fileUpload.setVisible(true);
+                sendChatBtn.setVisible(true);
+            } else {
+                chatInputArea.setReadOnly(true);
+                chatInputArea.setValue(""); 
+                chatInputArea.setPlaceholder("Müşteri kanalı ekipler için salt okunurdur.");
+                fileUpload.setVisible(false);
+                sendChatBtn.setVisible(false);
+            }
+            
+            refreshChatHistoryWindow();
+        });
 
-        Button submitBtn = new Button("TEKNİK ANALİZİ TAMAMLA", VaadinIcon.PAPERPLANE.create());
-        submitBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
-        submitBtn.setWidthFull();
-        submitBtn.addClickListener(e -> saveTechnicalEvaluationData());
+        chatHistoryArea.setWidthFull();
+        chatHistoryArea.setHeight("200px");
+        chatHistoryArea.getStyle()
+                .set("overflow-y", "auto")
+                .set("background", "#ffffff")
+                .set("border", "1px solid #cbd5e1")
+                .set("border-radius", "8px")
+                .set("padding", "12px");
 
-        Button returnBtn = new Button("Ürün Yöneticisine Geri Gönder", VaadinIcon.RECYCLE.create());
-        returnBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
-        returnBtn.setWidthFull();
-        returnBtn.addClickListener(e -> sendWorkflowBackToProductManager());
+        chatInputArea.setWidthFull();
+        chatInputArea.setHeight("60px");
+        chatInputArea.getStyle().set("margin-bottom", "5px");
 
         Span chatTitle = new Span("Talep İletişim Grubu");
         chatTitle.getStyle().set("font-weight", "bold").set("font-size", "1rem").set("margin-bottom", "5px");
 
-        rightPanel.add(metricCardRow, chatTitle, chatHistoryArea, chatInputArea, fileUpload, sendChatBtn, new Hr(), submitBtn, returnBtn);
+        rightPanel.add(metricCardRow, chatTabs, chatHistoryArea, chatInputArea, fileUpload, sendChatBtn, new Hr(), submitBtn, returnBtn);       
         workspaceLayout.add(leftPanel, rightPanel);
         add(workspaceLayout);
 
@@ -229,6 +262,11 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         techScoreSelect.addValueChangeListener(e -> { if (!isUpdatingUi) recalculateTechnicalScoreText(); });
         complexitySelect.addValueChangeListener(e -> { if (!isUpdatingUi) recalculateTechnicalScoreText(); });
         effortSelect.addValueChangeListener(e -> { if (!isUpdatingUi) recalculateTechnicalScoreText(); });
+
+        chatInputArea.setReadOnly(true);
+        chatInputArea.setPlaceholder("Müşteri kanalı ekipler için salt okunurdur.");
+        fileUpload.setVisible(false);
+        sendChatBtn.setVisible(false);
     }
 
     @Override
@@ -332,11 +370,12 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         
         pmScoreDisplay.setText(String.valueOf(currentPrioritization.getPriorityScore()));
 
+        boolean hasSavedTechnicalEvaluation = false;
+
         if (currentPrioritization.getSmTechnicalScore() != null) {
             techScoreDisplay.setText(String.valueOf(currentPrioritization.getSmTechnicalScore()));
             techScoreSelect.setValue(Math.min(5, Math.max(1, currentPrioritization.getSmTechnicalScore() / 10))); 
-        } else {
-            recalculateTechnicalScoreText();
+            hasSavedTechnicalEvaluation = true;
         }
 
         if (activeDept != null) {
@@ -345,6 +384,11 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         }
 
         isUpdatingUi = false;
+        
+        if (!hasSavedTechnicalEvaluation) {
+            recalculateTechnicalScoreText();
+        }
+
         refreshChatHistoryWindow();
     }
         
@@ -360,7 +404,17 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
     private void refreshChatHistoryWindow() {
         chatHistoryArea.removeAll();
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        List<WorkflowLog> chatLogs = workflowLogService.getChatHistoryForRequest(requestId);
+        
+        if (showingInternalTab) {
+            chatHistoryArea.getStyle().set("background", "#fffbeb"); 
+        } else {
+            chatHistoryArea.getStyle().set("background", "#ffffff"); 
+        }
+
+        List<WorkflowLog> chatLogs = workflowLogService.getChatHistoryForRequest(requestId).stream()
+                .filter(log -> log.isInternal() == showingInternalTab)
+                .sorted((l1, l2) -> l1.getCreatedAt().compareTo(l2.getCreatedAt()))
+                .toList();
         
         for (WorkflowLog log : chatLogs) {
             HorizontalLayout row = new HorizontalLayout();
@@ -394,7 +448,11 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
             }
 
             if (log.getLogText() != null && !log.getLogText().isEmpty()) {
-                Div textDiv = new Div(new Span(log.getLogText()));
+                String text = log.getLogText();
+                if (text.contains("[MÜŞTERİYE İADE EDİLDİ]")) {
+                    text = text.replace("[MÜŞTERİYE İADE EDİLDİ]: Gerekçe:", "").trim();
+                }
+                Div textDiv = new Div(new Span(text));
                 textDiv.getStyle().set("margin-top", "4px").set("white-space", "pre-wrap");
                 bubble.add(textDiv);
             }
@@ -426,13 +484,20 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         }
 
         try {
-            workflowLogService.saveChatComment(
-                requestId, 
-                chatInputArea.getValue(), 
-                currentUser, 
-                uploadedFileName, 
-                uploadedFileBytes
-            );
+            WorkflowLog log = new WorkflowLog();
+            log.setRequest(targetRequest);
+            log.setUser(currentUser);
+            log.setLogText(chatInputArea.getValue() != null ? chatInputArea.getValue().trim() : null);
+            log.setFromStatus(targetRequest.getStatus().name());
+            log.setToStatus(targetRequest.getStatus().name());
+            log.setInternal(showingInternalTab);
+
+            if (uploadedFileBytes != null && uploadedFileName != null) {
+                log.setFileName(uploadedFileName);
+                log.setFileBytes(uploadedFileBytes);
+            }
+
+            workflowLogRepository.save(log);
 
             chatInputArea.clear();
             fileUpload.clearFileList();

@@ -5,6 +5,7 @@ import com.example.entities.Prioritization;
 import com.example.entities.Request;
 import com.example.entities.User;
 import com.example.entities.WorkflowLog;
+import com.example.repositories.WorkflowLogRepository;
 import com.example.services.PrioritizationService;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
@@ -17,11 +18,14 @@ import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
@@ -42,8 +46,12 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     private final WorkflowService workflowService;
     private final WorkflowLogService workflowLogService;
     private final RequestService requestService;
+    private final WorkflowLogRepository workflowLogRepository;
 
     private Long requestId;
+    private Request targetRequest;
+    private boolean showingInternalTab = false;
+
     private final H2 titleLabel = new H2("İş Düzenleme Sayfası");
     private final VerticalLayout detailsCard = new VerticalLayout();
     private final TextArea devNotesArea = new TextArea("Mesaj");
@@ -52,20 +60,28 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
     private final Div scoreContainer = new Div();
     private final Div techScoreContainer = new Div();
 
+    private final Tabs chatTabs = new Tabs();
+    private final Tab customerTab = new Tab("Müşteri İletişimi");
+    private final Tab internalTab = new Tab("İç Değerlendirme");
+
     private final VerticalLayout chatHistoryArea = new VerticalLayout();
     private final Upload fileUpload;
     private final MemoryBuffer fileBuffer = new MemoryBuffer();
     private String uploadedFileName = null;
     private byte[] uploadedFileBytes = null;
+    
+    private final Button sendChatBtn;
 
     public DeveloperEditView(PrioritizationService prioritizationService, 
                              WorkflowService workflowService, 
                              WorkflowLogService workflowLogService,
-                             RequestService requestService) {
+                             RequestService requestService,
+                             WorkflowLogRepository workflowLogRepository) {
         this.prioritizationService = prioritizationService;
         this.workflowService = workflowService;
         this.workflowLogService = workflowLogService;
         this.requestService = requestService;
+        this.workflowLogRepository = workflowLogRepository;
 
         setSizeFull();
         setPadding(true);
@@ -136,13 +152,13 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
                 .set("border-radius", "8px")
                 .set("padding", "12px");
 
-        devNotesArea.setPlaceholder("Ekibe bir mesaj yazın veya dosya ekleyin...");
         devNotesArea.setWidthFull();
         devNotesArea.setHeight("70px");
 
         fileUpload = new Upload(fileBuffer);
         fileUpload.setMaxFiles(1);
         fileUpload.setAcceptedFileTypes(".pdf", ".png", ".jpg", ".docx", ".xlsx");
+        fileUpload.getStyle().set("margin-bottom", "10px");
         fileUpload.addSucceededListener(event -> {
             try {
                 this.uploadedFileName = event.getFileName();
@@ -153,9 +169,30 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             }
         });
 
-        Button sendChatBtn = new Button("Mesaj Gönder", e -> submitGroupChatMessage());
+        sendChatBtn = new Button("Mesaj Gönder", e -> submitGroupChatMessage());
         sendChatBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         sendChatBtn.setWidthFull();
+        sendChatBtn.getStyle().set("margin-bottom", "10px");
+
+        chatTabs.add(customerTab, internalTab);
+        chatTabs.setWidthFull();
+        chatTabs.addSelectedChangeListener(event -> {
+            showingInternalTab = event.getSelectedTab().equals(internalTab);
+            
+            if (showingInternalTab) {
+                devNotesArea.setReadOnly(false);
+                devNotesArea.setPlaceholder("Ekiple paylaşmak için bir şeyler yazın...");
+                fileUpload.setVisible(true);
+                sendChatBtn.setVisible(true);
+            } else {
+                devNotesArea.setReadOnly(true);
+                devNotesArea.setValue(""); 
+                devNotesArea.setPlaceholder("Müşteri kanalı ekipler için salt okunurdur.");
+                fileUpload.setVisible(false);
+                sendChatBtn.setVisible(false);
+            }
+            refreshChatHistoryWindow();
+        });
 
         VerticalLayout btnColumn = new VerticalLayout();
         btnColumn.setWidthFull();
@@ -172,9 +209,8 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
 
         btnColumn.add(completeBtn, sendBackBtn);
         
-        // Assemble Right Column
         actionsColumn.add(
-            new Span("Talep İletişim Grubu"), 
+            chatTabs, 
             chatHistoryArea, 
             devNotesArea, 
             fileUpload, 
@@ -185,6 +221,14 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
 
         mainSplit.add(infoColumn, actionsColumn);
         add(mainSplit);
+
+        Button backBtn = new Button("Geri Dön", VaadinIcon.ARROW_LEFT.create(), e -> UI.getCurrent().navigate("dev/dashboard"));
+        add(backBtn);
+
+        devNotesArea.setReadOnly(true);
+        devNotesArea.setPlaceholder("Müşteri kanalı ekipler için salt okunurdur.");
+        fileUpload.setVisible(false);
+        sendChatBtn.setVisible(false);
     }
 
     @Override
@@ -197,6 +241,7 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             UI.getCurrent().navigate("dev/dashboard");
             return;
         }
+        this.targetRequest = r;
 
         detailsCard.setWidthFull();
         detailsCard.setPadding(true);
@@ -315,7 +360,16 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
         chatHistoryArea.removeAll();
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
         
-        List<WorkflowLog> chatLogs = workflowLogService.getChatHistoryForRequest(requestId);
+        if (showingInternalTab) {
+            chatHistoryArea.getStyle().set("background", "#fffbeb"); 
+        } else {
+            chatHistoryArea.getStyle().set("background", "#ffffff"); 
+        }
+
+        List<WorkflowLog> chatLogs = workflowLogService.getChatHistoryForRequest(requestId).stream()
+                .filter(log -> log.isInternal() == showingInternalTab)
+                .sorted((l1, l2) -> l1.getCreatedAt().compareTo(l2.getCreatedAt()))
+                .toList();
         
         for (WorkflowLog log : chatLogs) {
             HorizontalLayout row = new HorizontalLayout();
@@ -335,11 +389,17 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             if (isMe) {
                 row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
                 bubble.getStyle().set("background-color", "#dcfce7").set("color", "#14532d").set("border-bottom-right-radius", "2px");
-                bubble.add(new Span("Siz (" + roleStr + "):"));
+                
+                Span label = new Span("Siz (" + roleStr + ")");
+                label.getStyle().set("font-weight", "bold").set("display", "block").set("margin-bottom", "4px");
+                bubble.add(label);
             } else {
                 row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
                 bubble.getStyle().set("background-color", "#f1f5f9").set("color", "#1e293b").set("border-bottom-left-radius", "2px");
-                bubble.add(new Span("" + log.getUser().getName() + " (" + roleStr + "):"));
+                
+                Span label = new Span(log.getUser().getName() + " (" + roleStr + ")");
+                label.getStyle().set("font-weight", "bold").set("display", "block").set("margin-bottom", "4px");
+                bubble.add(label);
             }
 
             if (log.getLogText() != null && !log.getLogText().isEmpty()) {
@@ -362,7 +422,6 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             row.add(bubble);
             chatHistoryArea.add(row);
         }
-        
         chatHistoryArea.getElement().executeJs("this.scrollTop = this.scrollHeight;");
     }
 
@@ -376,13 +435,20 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
         }
 
         try {
-            workflowLogService.saveChatComment(
-                requestId, 
-                devNotesArea.getValue(), 
-                currentUser, 
-                uploadedFileName, 
-                uploadedFileBytes
-            );
+            WorkflowLog log = new WorkflowLog();
+            log.setRequest(targetRequest);
+            log.setUser(currentUser);
+            log.setLogText(devNotesArea.getValue() != null ? devNotesArea.getValue().trim() : null);
+            log.setFromStatus(targetRequest.getStatus().name());
+            log.setToStatus(targetRequest.getStatus().name());
+            log.setInternal(showingInternalTab);
+
+            if (uploadedFileBytes != null && uploadedFileName != null) {
+                log.setFileName(uploadedFileName);
+                log.setFileBytes(uploadedFileBytes);
+            }
+
+            workflowLogRepository.save(log);
 
             devNotesArea.clear();
             fileUpload.clearFileList();

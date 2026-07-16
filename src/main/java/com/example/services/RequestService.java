@@ -1,6 +1,8 @@
 package com.example.services;
 
 import java.util.List;
+import java.util.Optional;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
@@ -87,12 +89,30 @@ public class RequestService {
 
     @Transactional
     public void approveAndPrioritizeRequest(Request request, Prioritization prioritization) {
+        request.setStatus(RequestStatus.APPROVED);
         Request managedRequest = entityManager.merge(request);
         
         prioritization.setRequest(managedRequest);
         prioritization.setId(managedRequest.getId()); 
+
+        Prioritization existing = entityManager.find(Prioritization.class, managedRequest.getId());
         
-        entityManager.persist(prioritization);
+        if (existing != null) {
+            existing.setUrgency(prioritization.getUrgency());
+            existing.setImpact(prioritization.getImpact());
+            existing.setTaskType(prioritization.getTaskType());
+            existing.setDepartment(prioritization.getDepartment());
+            existing.setPriorityScore(prioritization.getPriorityScore());
+            existing.setUpdatedAt(java.time.LocalDateTime.now());
+            
+            entityManager.merge(existing);
+        } else {
+            if (prioritization.getCreatedAt() == null) {
+                prioritization.setCreatedAt(java.time.LocalDateTime.now());
+            }
+            entityManager.persist(prioritization);
+        }
+        
         entityManager.flush(); 
     }
 

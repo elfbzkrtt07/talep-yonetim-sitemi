@@ -17,7 +17,7 @@ public class Workflow {
     @JoinColumn(name = "request_id", nullable = false)
     private Request request;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "current_assignee_id")
     private User currentAssignee;
 

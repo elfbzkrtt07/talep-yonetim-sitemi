@@ -35,7 +35,6 @@ public class PMWorkflowsView extends VerticalLayout implements BeforeEnterObserv
         Paragraph desc = new Paragraph("İş akışına dönüştürülen ve geliştirme ekipleri tarafından işlenen taleplerin güncel durumları.");
         desc.getStyle().set("color", "#64748b").set("margin", "0 var(--lumo-space-m) 20px var(--lumo-space-m)");
 
-        // Grid Configuration mapped to your Workflow entity schema
         workflowGrid.addColumn(w -> w.getRequest() != null ? w.getRequest().getId() : "-")
                 .setHeader("ID").setWidth("80px").setFlexGrow(0);
 
@@ -52,9 +51,8 @@ public class PMWorkflowsView extends VerticalLayout implements BeforeEnterObserv
         workflowGrid.addColumn(w -> w.getCurrentAssignee() != null ? w.getCurrentAssignee().getName() : "Atanmadı")
                 .setHeader("Atanan Yazılımcı");
 
-        workflowGrid.addColumn(Workflow::getStatus).setHeader("Aşama Durumu");
+        workflowGrid.addColumn(workflow -> workflow.getStatus() != null ? workflow.getStatus().toString() : "").setHeader("Aşama Durumu");
 
-        // Action button to inspect timeline log details
         workflowGrid.addComponentColumn(workflow -> {
             Button inspectBtn = new Button("İncele", VaadinIcon.SEARCH.create());
             inspectBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
@@ -74,7 +72,6 @@ public class PMWorkflowsView extends VerticalLayout implements BeforeEnterObserv
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        // Connects straight to the active pipeline tracking array query we wrote in Step 1
         List<com.example.entities.Workflow> activeTrackingPool = requestService.getAllWorkflows(); 
         workflowGrid.setItems(activeTrackingPool);
     }

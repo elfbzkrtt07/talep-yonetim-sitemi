@@ -66,9 +66,8 @@ public class PMPrioritizationsView extends VerticalLayout implements BeforeEnter
             return "-";
         }).setHeader("Başlık");
         
-        prioritizationGrid.addColumn(Prioritization::getDepartment).setHeader("Departman");
+        prioritizationGrid.addColumn(prioritization -> prioritization.getDepartment() != null ? prioritization.getDepartment().getName() : "").setHeader("Departman");
         prioritizationGrid.addColumn(Prioritization::getTaskType).setHeader("İş Tipi");
-        
         prioritizationGrid.addColumn(Prioritization::getPriorityScore)
                 .setHeader("Skor")
                 .setWidth("100px").setFlexGrow(0);

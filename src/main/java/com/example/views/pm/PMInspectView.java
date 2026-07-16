@@ -69,8 +69,8 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     private final Span priorityBadge = new Span("DÜŞÜK ÖNCELİKLİ");
 
     private final Tabs chatTabs = new Tabs();
-    private final Tab customerTab = new Tab("💬 Müşteri İletişimi");
-    private final Tab internalTab = new Tab("🔒 İç Değerlendirme");
+    private final Tab customerTab = new Tab("Müşteri İletişimi");
+    private final Tab internalTab = new Tab("İç Değerlendirme");
 
     private final VerticalLayout chatHistoryArea = new VerticalLayout();
     private final TextArea chatInputArea = new TextArea();
@@ -344,6 +344,8 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
             badgesRow.add(affectedBadge, companyBadge);
             detailsCard.add(titleHeader, descContainer, badgesRow);
             
+            boolean hasExistingPrioritization = false;
+            
             try {
                 Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
                 
@@ -353,6 +355,7 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 departmentField.setValue(existingPrior.getDepartment());
                 
                 updateScoreBadgeVisuals(existingPrior.getPriorityScore());
+                hasExistingPrioritization = true;
                 
             } catch (Exception ex) {
                 impactSelect.setValue(1);
@@ -361,7 +364,10 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 departmentField.setValue(null);
             } finally {
                 isUpdatingUi = false;
-                refreshCalculatedScoreText();
+                
+                if (!hasExistingPrioritization) {
+                    refreshCalculatedScoreText();
+                }
                 refreshChatHistoryWindow();
             }
         }
@@ -516,7 +522,8 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
 
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
         targetRequest.setStatus(RequestStatus.APPROVED);
-        int calculatedScoreInt = Integer.parseInt(scoreValue.getText());
+        
+        int calculatedScoreInt = Integer.parseInt(scoreValue.getText()); 
         
         Prioritization prioritization = new Prioritization(
                 targetRequest,
@@ -526,7 +533,6 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 chosenDept,
                 calculatedScoreInt
         );
-        prioritization.setId(targetRequest.getId());
 
         if (currentUser != null) {
             workflowLogService.saveChatComment(requestId, "[TALEP ONAYLANDI]: Talep incelendi ve öncelik havuzuna aktarıldı. Skor: " + calculatedScoreInt, currentUser, null, null);
@@ -560,8 +566,21 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 workflowLogService.saveChatComment(requestId, "[MÜŞTERİYE İADE EDİLDİ]: Gerekçe: " + note, currentUser, null, null);
             }
 
-            requestService.updateRequestStatus(targetRequest.getId(), RequestStatus.SENT_BACK);
+            Department chosenDept = departmentField.getValue();
+            int currentManualScore = Integer.parseInt(scoreValue.getText());
             
+            Prioritization tempPrioritization = new Prioritization(
+                    targetRequest,
+                    urgencySelect.getValue(),
+                    impactSelect.getValue(),
+                    typeSelect.getValue(),
+                    chosenDept,
+                    currentManualScore
+            );
+            
+            requestService.approveAndPrioritizeRequest(targetRequest, tempPrioritization);
+            requestService.updateRequestStatus(targetRequest.getId(), RequestStatus.SENT_BACK);
+
             Notification.show("Talep müşteriye geri gönderildi.").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             
             rejectDialog.close();
