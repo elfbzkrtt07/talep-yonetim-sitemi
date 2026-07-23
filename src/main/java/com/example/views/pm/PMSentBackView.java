@@ -5,6 +5,7 @@ import com.example.entities.User;
 import com.example.entities.Workflow;
 import com.example.enums.WorkflowStatus;
 import com.example.services.RequestService;
+import com.example.views.base.BaseSecuredView;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -15,17 +16,15 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @PageTitle("Geri Gönderilen İş Akışları")
 @Route(value = "pm/sent-back", layout = MainLayout.class)
-public class PMSentBackView extends VerticalLayout implements BeforeEnterObserver {
+public class PMSentBackView extends BaseSecuredView {
 
     private final RequestService requestService;
     private final Grid<Workflow> sentBackGrid = new Grid<>(Workflow.class, false);
@@ -110,13 +109,7 @@ public class PMSentBackView extends VerticalLayout implements BeforeEnterObserve
     }
 
     @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        if (currentUser == null) {
-            event.rerouteTo("login");
-            return;
-        }
-        
+    protected void onUserAuthenticated(BeforeEnterEvent event, User user) {
         loadDataFromService();
     }
 
@@ -195,7 +188,7 @@ public class PMSentBackView extends VerticalLayout implements BeforeEnterObserve
         if (subtitleText != null && !subtitleText.isEmpty()) {
             Span subtitle = new Span(subtitleText);
             subtitle.getStyle()
-                    .set("margin-top", "8px") 
+                    .set("margin-top", "8px")
                     .set("font-size", "0.9rem")
                     .set("color", "#64748b")
                     .set("text-align", "center");

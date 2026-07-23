@@ -40,7 +40,6 @@ public class PrioritizationService {
         Request request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found with id: " + requestId));
         
-        // 1. Customer Factor
         double customerScore = 0.0;
         if (request.getCustomer() != null && request.getCustomer().getCompany() != null) {
             customerScore = request.getCustomer().getCompany().getCompanyScore();
@@ -49,7 +48,6 @@ public class PrioritizationService {
         double logBase2 = Math.log(logInnerValue) / Math.log(2); 
         double customerFactor = 1.0 + logBase2;
 
-        // 2. Base Matrix Math
         double baseScore = prioritization.getImpact() * prioritization.getUrgency() * taskTypeCoefficient * (customerFactor + waitTime + interventionTime) / 1.8;
 
         double affectedPointsModifier = 0.0;
@@ -71,42 +69,42 @@ public class PrioritizationService {
         return prioritizationRepository.save(prioritization);
     }
     
-    public int calculatePreviewScore(Request request, int impact, int urgency, com.example.enums.TaskType taskType) {
-        double taskTypeCoefficient = 1.0;
-        if (taskType != null) {
-            switch (taskType) {
-                case BUG: taskTypeCoefficient = 1.5; break;
-                case FEATURE_REQUEST: taskTypeCoefficient = 1.2; break;
-                case CHANGE_REQUEST: taskTypeCoefficient = 1.1; break;
-                case SUPPORT: taskTypeCoefficient = 1.0; break;
+    public int calculatePreviewScore(Request request, Integer impact, Integer urgency, TaskType taskType) {
+        if (impact == null) impact = 1;
+        if (urgency == null) urgency = 1;
+
+        int baseScore = impact * urgency; 
+
+        if (request.getAffectedNo() != null && request.getAffectedNo() > 0) {
+            baseScore += Math.min(20, request.getAffectedNo() / 5); 
+        }
+
+        if (request.getDeadline() != null) {
+            long daysUntilDeadline = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), request.getDeadline());
+            if (daysUntilDeadline <= 3) {
+                baseScore += 12;
+            } else if (daysUntilDeadline <= 7) {
+                baseScore += 7;
             }
         }
 
-        double customerScore = 0.0;
-        if (request != null && request.getCustomer() != null && request.getCustomer().getCompany() != null) {
-            customerScore = request.getCustomer().getCompany().getCompanyScore();
+        if (Boolean.TRUE.equals(request.getIsSecurityRisk())) {
+            baseScore += 25; 
         }
-        double logInnerValue = 1.0 + (customerScore / 6.25);
-        double logBase2 = Math.log(logInnerValue) / Math.log(2); 
-        double customerFactor = 1.0 + logBase2;
 
-        double waitTime = 0.5; 
-        double interventionTime = 0.2;
-
-        double baseScore = impact * urgency * taskTypeCoefficient * (customerFactor + waitTime + interventionTime)  / 1.8;
-
-        double affectedPointsModifier = 0.0;
-        if (request != null && request.getAffectedNo() != null) {
-            int affectedCount = request.getAffectedNo();
-            if (affectedCount > 0 && affectedCount <= 10) affectedPointsModifier = 2.0;
-            else if (affectedCount > 10 && affectedCount <= 100) affectedPointsModifier = 5.0;
-            else if (affectedCount > 100 && affectedCount <= 1000) affectedPointsModifier = 10.0;
-            else if (affectedCount > 1000) affectedPointsModifier = 20.0;
+        if (request.getFinancialImpact() != null && !request.getFinancialImpact().isBlank()) {
+            String impactLevel = request.getFinancialImpact();
+            
+            if (impactLevel.contains("Kritik") || impactLevel.contains("Yüksek")) {
+                baseScore += 25;
+            } else if (impactLevel.contains("Orta")) {
+                baseScore += 15;
+            } else {
+                baseScore += 8;
+            }
         }
-        baseScore += affectedPointsModifier;
 
-        int finalRoundedScore = (int) Math.round(baseScore);
-        return Math.min(finalRoundedScore, 100);
+        return baseScore;
     }
 
     @Transactional

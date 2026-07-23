@@ -47,7 +47,7 @@ public class WorkflowService {
         Workflow workflow = workflowRepository.findById(requestId)
                 .orElse(new Workflow());
         
-        workflow.setworkflowId(requestId);
+        workflow.setWorkflowId(requestId);
         workflow.setRequest(request);
         workflow.setCurrentAssignee(developer);
         workflow.setStatus(WorkflowStatus.DEVELOPMENT); 
@@ -90,7 +90,7 @@ public class WorkflowService {
         Workflow workflow = workflowRepository.findById(requestId)
                 .orElseGet(() -> {
                     Workflow newWf = new Workflow();
-                    newWf.setworkflowId(requestId);
+                    newWf.setWorkflowId(requestId);
                     newWf.setRequest(request);
                     newWf.setCreatedAt(java.time.LocalDateTime.now());
                     return newWf;

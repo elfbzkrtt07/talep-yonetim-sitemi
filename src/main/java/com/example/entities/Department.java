@@ -3,6 +3,7 @@ package com.example.entities;
 import java.util.List;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 import jakarta.validation.constraints.NotBlank;
 
 @Entity
@@ -20,6 +21,9 @@ public class Department {
     @OneToMany(mappedBy = "department", fetch = FetchType.LAZY)
     private List<User> users;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
     public Department() {}
 
     public Department(String name) {
@@ -34,4 +38,7 @@ public class Department {
 
     public List<User> getUsers() { return users; }
     public void setUsers(List<User> users) { this.users = users; }
+
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
 }

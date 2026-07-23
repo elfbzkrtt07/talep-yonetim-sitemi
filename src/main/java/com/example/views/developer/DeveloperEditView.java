@@ -38,6 +38,7 @@ import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.server.VaadinSession;
 
 import java.io.ByteArrayInputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -289,15 +290,54 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
 
         HorizontalLayout badgesRow = new HorizontalLayout();
         badgesRow.setSpacing(true);
+        badgesRow.getStyle().set("flex-wrap", "wrap").set("gap", "6px").set("margin-top", "8px");
 
-        Span affectedBadge = new Span();
-        affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
-        if (r.getAffectedNo() != null) {
-            affectedBadge.setText(r.getAffectedNo() + " Etkilenen");
-            affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
-        } else {
-            affectedBadge.setText("Belirtilmemis");
-            affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        if (r.getAffectedNo() != null && r.getAffectedNo() > 0) {
+            Span affectedBadge = new Span(r.getAffectedNo() + " Etkilenen");
+            affectedBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#e0f2fe")
+                    .set("color", "#0369a1");
+            badgesRow.add(affectedBadge);
+        }
+
+        if (r.getDeadline() != null) {
+            Span deadlineBadge = new Span("Deadline: " + r.getDeadline().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+            deadlineBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#fef3c7")
+                    .set("color", "#b45309");
+            badgesRow.add(deadlineBadge);
+        }
+
+        if (Boolean.TRUE.equals(r.getIsSecurityRisk())) {
+            Span securityBadge = new Span("KVKK / Güvenlik Riski");
+            securityBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#fee2e2")
+                    .set("color", "#991b1b");
+            badgesRow.add(securityBadge);
+        }
+
+        if (r.getFinancialImpact() != null && !r.getFinancialImpact().isBlank() && !"Etkisi Yok".equalsIgnoreCase(r.getFinancialImpact())) {
+            Span financialBadge = new Span("Mali Etki: " + r.getFinancialImpact());
+            financialBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#f0fdf4")
+                    .set("color", "#166534");
+            badgesRow.add(financialBadge);
         }
 
         Span companyBadge = new Span();
@@ -311,8 +351,8 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
             companyBadge.setText("Bireysel");
             companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
         }
+        badgesRow.add(companyBadge);
 
-        badgesRow.add(affectedBadge, companyBadge);
         detailsCard.add(titleHeader, descContainer, badgesRow);
 
         try {
@@ -423,7 +463,7 @@ public class DeveloperEditView extends VerticalLayout implements HasUrlParameter
                 byte[] bytes = log.getFileBytes();
                 
                 StreamResource resource = new StreamResource(name, () -> new ByteArrayInputStream(bytes));
-                Anchor downloadAnchor = new Anchor(resource, "📁 " + name);
+                Anchor downloadAnchor = new Anchor(resource, name);
                 downloadAnchor.getElement().setAttribute("download", true);
                 downloadAnchor.getStyle().set("display", "block").set("margin-top", "6px").set("font-weight", "bold").set("color", isMe ? "#166534" : "#1d4ed8");
                 bubble.add(downloadAnchor);

@@ -8,6 +8,7 @@ import com.example.entities.WorkflowLog;
 import com.example.repositories.WorkflowLogRepository;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
+import com.example.views.base.BaseSecuredView;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -26,9 +27,7 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -36,7 +35,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Route(value = "sm/dashboard", layout = MainLayout.class)
-public class SMDashboardView extends VerticalLayout implements BeforeEnterObserver {
+public class SMDashboardView extends BaseSecuredView {
 
     private final RequestService requestService;
     private final WorkflowLogService workflowLogService;
@@ -57,13 +56,15 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
     private final Span currentChatStatus = new Span();
     private final Button btnGoToDetails = new Button("Detaylı İncele", VaadinIcon.EXTERNAL_LINK.create());
 
+    private boolean showOnlyInternal = true;
+    private final Button btnToggleFilter = new Button("Sadece Internal", VaadinIcon.EYE.create());
+
     private final H1 welcomeHeading = new H1("Hoşgeldiniz");
     private final VerticalLayout recentRequestsLayout = new VerticalLayout();
     private final VerticalLayout technicalEvalLayout = new VerticalLayout();
 
     private List<Request> allRequests = new ArrayList<>();
     private Request selectedRequest = null;
-    private User currentUser = null;
 
     public SMDashboardView(RequestService requestService, 
                            WorkflowLogService workflowLogService,
@@ -88,12 +89,8 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
     }
 
     @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        if (currentUser == null) {
-            event.rerouteTo("login");
-            return;
-        }
+    protected void onUserAuthenticated(BeforeEnterEvent event, User user) {
+        this.currentUser = user;
         loadDashboardData();
     }
 
@@ -248,7 +245,7 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
 
             Button btnGo = new Button(VaadinIcon.ARROW_RIGHT.create());
             btnGo.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-            btnGo.addClickListener(e -> UI.getCurrent().navigate("sm/inspect/" + req.getId()));
+            btnGo.addClickListener(e -> UI.getCurrent().navigate("sm/evaluate/" + req.getId()));
 
             row.add(id, title, status, btnGo);
             row.setFlexGrow(1, title);
@@ -354,8 +351,29 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
             }
         });
 
-        HorizontalLayout titleGroup = new HorizontalLayout(currentChatTitle, currentChatStatus);
+        btnToggleFilter.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+        btnToggleFilter.setVisible(false);
+        btnToggleFilter.addClickListener(e -> {
+            showOnlyInternal = !showOnlyInternal;
+            btnToggleFilter.setText(showOnlyInternal ? "Sadece Internal" : "Sadece External (Salt Okunur)");
+            btnToggleFilter.addThemeVariants(showOnlyInternal ? ButtonVariant.LUMO_PRIMARY : ButtonVariant.LUMO_SUCCESS);
+            
+            messageInput.setEnabled(showOnlyInternal);
+            btnSend.setEnabled(showOnlyInternal);
+            if (!showOnlyInternal) {
+                messageInput.setPlaceholder("Müşteri sohbeti salt okunurdur.");
+            } else {
+                messageInput.setPlaceholder("Bir mesaj yazın...");
+            }
+
+            if (selectedRequest != null) {
+                loadChatHistory(selectedRequest.getId());
+            }
+        });
+
+        HorizontalLayout titleGroup = new HorizontalLayout(currentChatTitle, currentChatStatus, btnToggleFilter);
         titleGroup.setAlignItems(Alignment.CENTER);
+        titleGroup.setSpacing(true);
 
         chatHeader.add(titleGroup, btnGoToDetails);
         chatHeader.setFlexGrow(1, titleGroup);
@@ -465,8 +483,11 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
         currentChatTitle.setText("#" + req.getId() + " " + req.getTitle());
         currentChatStatus.setText(req.getStatus() != null ? req.getStatus().toString() : "Bilinmiyor");
         btnGoToDetails.setVisible(true);
-        messageInput.setEnabled(true);
-        btnSend.setEnabled(true);
+        btnToggleFilter.setVisible(true);
+        
+        messageInput.setEnabled(showOnlyInternal);
+        btnSend.setEnabled(showOnlyInternal);
+        messageInput.setPlaceholder(showOnlyInternal ? "Bir mesaj yazın..." : "Müşteri sohbeti salt okunurdur.");
 
         loadChatHistory(req.getId());
     }
@@ -475,7 +496,7 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
         chatHistoryContainer.removeAll();
 
         List<WorkflowLog> logs = workflowLogRepository.findByRequestIdWithUser(requestId).stream()
-                .filter(WorkflowLog::isInternal)
+                .filter(log -> showOnlyInternal ? log.isInternal() : !log.isInternal())
                 .sorted((l1, l2) -> {
                     if (l1.getCreatedAt() == null) return 1;
                     if (l2.getCreatedAt() == null) return -1;
@@ -484,7 +505,7 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
                 .toList();
 
         if (logs.isEmpty()) {
-            Span emptyMsg = new Span("Henüz yazışma bulunmuyor.");
+            Span emptyMsg = new Span("Henüz bu filtreye uygun yazışma bulunmuyor.");
             emptyMsg.getStyle().set("color", "#94a3b8").set("font-size", "0.9rem").set("margin", "auto");
             chatHistoryContainer.add(emptyMsg);
             return;
@@ -520,7 +541,7 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
 
             bubble.add(sender, content, time);
 
-            boolean isMe = senderUser != null && senderUser.getId().equals(currentUser.getId());
+            boolean isMe = senderUser != null && currentUser != null && senderUser.getId().equals(currentUser.getId());
             bubbleWrapper.getStyle().set("justify-content", isMe ? "flex-end" : "flex-start");
             if(isMe) bubble.getStyle().set("background-color", "#d9fdd3"); 
 
@@ -531,6 +552,8 @@ public class SMDashboardView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private void sendChatMessage() {
+        if (!showOnlyInternal) return;
+
         String text = messageInput.getValue().trim();
         if (text.isEmpty() || selectedRequest == null) return;
 

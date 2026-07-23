@@ -38,7 +38,8 @@ public class DepartmentService {
                 .orElseThrow(() -> new IllegalArgumentException("Department not found with id: " + department.getId()));
         
         existingDepartment.setName(department.getName());
-
+        existingDepartment.setActive(department.isActive());
+        
         return departmentRepository.save(existingDepartment);
     }
     

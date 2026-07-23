@@ -1,73 +1,69 @@
 package com.example.views.customer;
 
-import com.example.services.RequestService;
-import com.example.services.WorkflowLogService;
-import com.example.enums.RequestStatus;
+import com.example.base.ui.MainLayout;
 import com.example.entities.Request;
 import com.example.entities.User;
-import com.example.entities.Prioritization;
 import com.example.entities.WorkflowLog;
-import com.example.repositories.PrioritizationRepository;
+import com.example.enums.RequestStatus;
 import com.example.repositories.WorkflowLogRepository;
+import com.example.services.RequestService;
+import com.example.services.SystemSettingService;
+import com.example.services.WorkflowLogService;
+import com.example.views.auth.SystemSettingsView;
+import com.example.views.base.BaseSecuredView;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.Image;
-import com.vaadin.flow.component.html.Paragraph;
-import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.Anchor;
+import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.StreamResource;
-import com.vaadin.flow.server.VaadinSession;
-import com.example.base.ui.MainLayout;
 
 import java.io.ByteArrayInputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Route(value = "customer/dashboard", layout = MainLayout.class)
-public class CustomerDashboardView extends VerticalLayout implements BeforeEnterObserver {
+public class CustomerDashboardView extends BaseSecuredView {
 
     private final RequestService requestService;
-    private final PrioritizationRepository prioritizationRepository;
     private final WorkflowLogRepository workflowLogRepository;
     private final WorkflowLogService workflowLogService;
+    private final SystemSettingService systemSettingService;
 
     private final Grid<Request> requestGrid = new Grid<>(Request.class, false);
     
     private final H2 pageTitle = new H2("Hoşgeldiniz");
     private final Paragraph introParagraph = new Paragraph("Aşağıdaki tablodan mevcut taleplerinizi inceleyebilir, durumlarını takip edebilir veya düzenleyebilirsiniz.");
 
-    // Dynamic fields used for holding uploads inside the active dialog
     private String uploadedFileName = null;
     private byte[] uploadedFileBytes = null;
 
     public CustomerDashboardView(RequestService requestService, 
-                                 PrioritizationRepository prioritizationRepository,
                                  WorkflowLogRepository workflowLogRepository,
-                                 WorkflowLogService workflowLogService) {
+                                 WorkflowLogService workflowLogService,
+                                 SystemSettingService systemSettingService) {
         this.requestService = requestService;
-        this.prioritizationRepository = prioritizationRepository;
         this.workflowLogRepository = workflowLogRepository;
         this.workflowLogService = workflowLogService;
+        this.systemSettingService = systemSettingService;
 
         setSizeFull();
         setPadding(true);
@@ -81,7 +77,7 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         
         HorizontalLayout logoLayout = new HorizontalLayout(logo);
         logoLayout.setWidthFull();
-        logoLayout.setJustifyContentMode(JustifyContentMode.CENTER);
+        logoLayout.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
 
         pageTitle.getStyle()
             .set("font-size", "2.5rem")
@@ -131,29 +127,47 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
     }
 
     @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        if (currentUser == null) return;
-
+    protected void onUserAuthenticated(BeforeEnterEvent event, User user) {
+        this.currentUser = user;
         Map<String, List<String>> parameters = event.getLocation().getQueryParameters().getParameters();
+
+        List<Request> userRequests = requestService.getAllRequests().stream()
+                .filter(r -> r.getCustomer() != null && r.getCustomer().getId().equals(currentUser.getId()))
+                .toList();
 
         if (parameters.containsKey("filter") && "sent_back".equals(parameters.get("filter").get(0))) {
             pageTitle.setText("Geri Dönen Talepleriniz");
             introParagraph.setText("Yöneticiler tarafından revizyon istenen ve aksiyon almanız gereken talepler listelenmektedir.");
             
-            List<Request> sentBackRequests = requestService.getAllRequests().stream()
+            List<Request> sentBackRequests = userRequests.stream()
                     .filter(r -> r.getStatus() == RequestStatus.SENT_BACK)
                     .toList();
             requestGrid.setItems(sentBackRequests);
             
         } else {
-            pageTitle.setText("Hoşgeldiniz");
+            pageTitle.setText("Hoşgeldiniz, " + currentUser.getName());
             introParagraph.setText("Aşağıdaki tablodan mevcut taleplerinizi inceleyebilir, durumlarını takip edebilir veya düzenleyebilirsiniz.");
-            requestGrid.setItems(requestService.getAllRequests());
+            requestGrid.setItems(userRequests);
         }
 
         if (parameters.containsKey("action") && "new".equals(parameters.get("action").get(0))) {
             UI.getCurrent().access(this::openNewRequestModal);
+        }
+    }
+
+    private void refreshGridItems() {
+        if (currentUser == null) return;
+
+        List<Request> userRequests = requestService.getAllRequests().stream()
+                .filter(r -> r.getCustomer() != null && r.getCustomer().getId().equals(currentUser.getId()))
+                .toList();
+
+        if ("Geri Dönen Talepleriniz".equals(pageTitle.getText())) {
+            requestGrid.setItems(userRequests.stream()
+                    .filter(r -> r.getStatus() == RequestStatus.SENT_BACK)
+                    .toList());
+        } else {
+            requestGrid.setItems(userRequests);
         }
     }
 
@@ -166,26 +180,99 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         titleField.setWidthFull();
         titleField.setPlaceholder("Lütfen kısa bir başlık yazın...");
 
-        com.vaadin.flow.component.textfield.IntegerField affectedNoField = new com.vaadin.flow.component.textfield.IntegerField("Etkilenen Sayısı / No");
+        TextArea descriptionField = new TextArea("Talep Detayı ve Açıklama");
+        descriptionField.setWidthFull();
+        descriptionField.setHeight("130px");
+        descriptionField.setPlaceholder("Talebinizin detaylarını buraya girin...");
+
+        IntegerField affectedNoField = new IntegerField("Etkilenen Sayısı / No");
         affectedNoField.setWidthFull();
         affectedNoField.setMin(0);
         affectedNoField.setPlaceholder("Kaç kişi/sistem etkileniyor?");
+        affectedNoField.setVisible(false);
 
-        TextArea descriptionField = new TextArea("Talep Detayı ve Açıklama");
-        descriptionField.setWidthFull();
-        descriptionField.setHeight("150px");
-        descriptionField.setPlaceholder("Talebinizin detaylarını buraya girin...");
+        DatePicker deadlineField = new DatePicker("Hedeflenen Tarih (Deadline)");
+        deadlineField.setWidthFull();
+        deadlineField.setVisible(false);
 
-        com.vaadin.flow.component.upload.receivers.MemoryBuffer buffer = new com.vaadin.flow.component.upload.receivers.MemoryBuffer();
-        com.vaadin.flow.component.upload.Upload uploadField = new com.vaadin.flow.component.upload.Upload(buffer);
+        Checkbox securityCheckbox = new Checkbox("Kritik: KVKK İhlali veya Güvenlik Zafiyeti İçeriyor");
+        securityCheckbox.getStyle().set("color", "var(--lumo-error-text-color)").set("font-weight", "bold");
+        securityCheckbox.setVisible(false);
+
+        Select<String> financialImpactField = new Select<>();
+        financialImpactField.setLabel("Mali / Finansal Etki Seviyesi");
+        financialImpactField.setItems("Etkisi Yok", "Düşük Zarar", "Orta Düzey Zarar", "Kritik / İş Durdurucu Zarar");
+        financialImpactField.setValue("Etkisi Yok");
+        financialImpactField.setWidthFull();
+        financialImpactField.setVisible(false);
+
+        HorizontalLayout optionalButtonsLayout = new HorizontalLayout();
+        optionalButtonsLayout.getStyle()
+                .set("flex-wrap", "wrap")
+                .set("gap", "8px")
+                .set("margin-top", "10px")
+                .set("margin-bottom", "10px");
+
+        if (systemSettingService.isFeatureEnabled(SystemSettingsView.KEY_AFFECTED_NO, true)) {
+            Button btnAffected = new Button("+ Etkilenen Sayısı", VaadinIcon.USERS.create());
+            btnAffected.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_CONTRAST);
+            btnAffected.addClickListener(e -> {
+                affectedNoField.setVisible(!affectedNoField.isVisible());
+                btnAffected.setText(affectedNoField.isVisible() ? "- Etkilenen Sayısı" : "+ Etkilenen Sayısı");
+            });
+            optionalButtonsLayout.add(btnAffected);
+        }
+
+        if (systemSettingService.isFeatureEnabled(SystemSettingsView.KEY_DEADLINE, true)) {
+            Button btnDeadline = new Button("+ Target Deadline", VaadinIcon.CALENDAR.create());
+            btnDeadline.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_CONTRAST);
+            btnDeadline.addClickListener(e -> {
+                deadlineField.setVisible(!deadlineField.isVisible());
+                btnDeadline.setText(deadlineField.isVisible() ? "- Target Deadline" : "+ Target Deadline");
+            });
+            optionalButtonsLayout.add(btnDeadline);
+        }
+
+        if (systemSettingService.isFeatureEnabled(SystemSettingsView.KEY_SECURITY_RISK, true)) {
+            Button btnSecurity = new Button("+ Güvenlik / KVKK Riski", VaadinIcon.SHIELD.create());
+            btnSecurity.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_ERROR);
+            btnSecurity.addClickListener(e -> {
+                securityCheckbox.setVisible(!securityCheckbox.isVisible());
+                if (!securityCheckbox.isVisible()) securityCheckbox.setValue(false);
+                btnSecurity.setText(securityCheckbox.isVisible() ? "- Güvenlik / KVKK Riski" : "+ Güvenlik / KVKK Riski");
+            });
+            optionalButtonsLayout.add(btnSecurity);
+        }
+
+        if (systemSettingService.isFeatureEnabled(SystemSettingsView.KEY_FINANCIAL_IMPACT, true)) {
+            Button btnFinancial = new Button("+ Mali Etki", VaadinIcon.DOLLAR.create());
+            btnFinancial.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_CONTRAST);
+            btnFinancial.addClickListener(e -> {
+                financialImpactField.setVisible(!financialImpactField.isVisible());
+                btnFinancial.setText(financialImpactField.isVisible() ? "- Mali Etki" : "+ Mali Etki");
+            });
+            optionalButtonsLayout.add(btnFinancial);
+        }
+
+        MemoryBuffer buffer = new MemoryBuffer();
+        Upload uploadField = new Upload(buffer);
         uploadField.setMaxFileSize(5 * 1024 * 1024);
         uploadField.setUploadButton(new Button("Dosya Ekle", VaadinIcon.UPLOAD.create()));
         uploadField.setDropLabel(new Paragraph("Veya dosyayı buraya sürükleyin"));
 
-        VerticalLayout modalBody = new VerticalLayout(titleField, affectedNoField, descriptionField, uploadField);
+        VerticalLayout modalBody = new VerticalLayout(
+            titleField, 
+            descriptionField, 
+            optionalButtonsLayout, 
+            affectedNoField, 
+            deadlineField, 
+            securityCheckbox, 
+            financialImpactField, 
+            uploadField
+        );
         modalBody.setPadding(false);
         modalBody.setSpacing(true);
-        modalBody.setWidth("500px");
+        modalBody.setWidth("550px");
 
         Button cancelBtn = new Button("İptal Et", e -> modal.close());
         Button submitBtn = new Button("Oluştur", VaadinIcon.PAPERPLANE.create());
@@ -194,22 +281,37 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         submitBtn.addClickListener(e -> {
             String title = titleField.getValue().trim();
             String description = descriptionField.getValue().trim();
-            Integer affectedNo = affectedNoField.getValue();
 
-            if (title.isEmpty() || description.isEmpty() || affectedNo == null) {
-                Notification.show("Lütfen tüm alanları doldurun!")
+            if (title.isEmpty() || description.isEmpty()) {
+                Notification.show("Başlık ve açıklama alanları zorunludur!")
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
             
-            User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
             if (currentUser == null) {
                 Notification.show("Oturum zaman aşımına uğradı. Yeniden giriş yapın.")
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
 
-            Request newRequest = new Request(currentUser, title, description, affectedNo);
+            Request newRequest = new Request();
+            newRequest.setCustomer(currentUser);
+            newRequest.setTitle(title);
+            newRequest.setDescription(description);
+            
+            if (affectedNoField.isVisible() && affectedNoField.getValue() != null) {
+                newRequest.setAffectedNo(affectedNoField.getValue());
+            }
+            if (deadlineField.isVisible() && deadlineField.getValue() != null) {
+                newRequest.setDeadline(deadlineField.getValue());
+            }
+            if (securityCheckbox.isVisible() && securityCheckbox.getValue()) {
+                newRequest.setIsSecurityRisk(true);
+            }
+            if (financialImpactField.isVisible() && !financialImpactField.getValue().isBlank()) {
+                newRequest.setFinancialImpact(financialImpactField.getValue().trim());
+            }
+
             Request savedRequest = requestService.submitRequest(newRequest); 
 
             String fileName = null;
@@ -226,7 +328,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
                 }
             }
 
-            // Create a public log entry on creation to tie the attachment to the request timeline
             workflowLogService.saveChatComment(
                 savedRequest.getId(), 
                 "[TALEP OLUŞTURULDU]: " + description, 
@@ -253,7 +354,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         modal.setHeaderTitle("Destek/Geliştirme Talebini Düzenle");
         modal.setCloseOnOutsideClick(false);
 
-        // Reset temporary attachment buffers
         uploadedFileName = null;
         uploadedFileBytes = null;
 
@@ -262,16 +362,15 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         modalBody.setSpacing(true);
         modalBody.setWidth("500px");
 
-        // PM Feedback Banner (extracted from non-internal logs)
         if (request.getStatus() == RequestStatus.SENT_BACK) {
             String feedbackNote = null;
 
             if (workflowLogRepository != null) {
-                List<com.example.entities.WorkflowLog> logs = workflowLogRepository.findByRequestIdWithUser(request.getId()).stream()
+                List<WorkflowLog> logs = workflowLogRepository.findByRequestIdWithUser(request.getId()).stream()
                         .sorted((l1, l2) -> l2.getCreatedAt().compareTo(l1.getCreatedAt()))
                         .toList();
 
-                for (com.example.entities.WorkflowLog log : logs) {
+                for (WorkflowLog log : logs) {
                     String logText = log.getLogText();
                     if (logText != null && logText.contains("[MÜŞTERİYE İADE EDİLDİ]")) {
                         feedbackNote = logText.replace("[MÜŞTERİYE İADE EDİLDİ]: Gerekçe:", "").trim();
@@ -299,7 +398,7 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         titleField.setWidthFull();
         titleField.setValue(request.getTitle() != null ? request.getTitle() : "");
 
-        com.vaadin.flow.component.textfield.IntegerField affectedNoField = new com.vaadin.flow.component.textfield.IntegerField("Etkilenen Sayısı / No");
+        IntegerField affectedNoField = new IntegerField("Etkilenen Sayısı / No");
         affectedNoField.setWidthFull();
         affectedNoField.setMin(0);
         affectedNoField.setValue(request.getAffectedNo() != null ? request.getAffectedNo() : 0);
@@ -311,7 +410,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
 
         modalBody.add(titleField, affectedNoField, descriptionField);
 
-        // 💬 Customer Chat History Area (Formatted like PMInspectView)
         VerticalLayout chatSection = new VerticalLayout();
         chatSection.setPadding(false);
         chatSection.setSpacing(true);
@@ -333,15 +431,12 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
                 .set("border-radius", "8px")
                 .set("padding", "12px");
 
-        User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-
-        // Filter out internal communication logs
-        List<com.example.entities.WorkflowLog> customerVisibleLogs = workflowLogRepository.findByRequestIdWithUser(request.getId()).stream()
+        List<WorkflowLog> customerVisibleLogs = workflowLogRepository.findByRequestIdWithUser(request.getId()).stream()
                 .filter(log -> !log.isInternal()) 
                 .sorted((l1, l2) -> l1.getCreatedAt().compareTo(l2.getCreatedAt())) 
                 .toList();
 
-        for (com.example.entities.WorkflowLog log : customerVisibleLogs) {
+        for (WorkflowLog log : customerVisibleLogs) {
             HorizontalLayout row = new HorizontalLayout();
             row.setWidthFull();
             
@@ -353,8 +448,8 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
                     .set("font-size", "0.9rem")
                     .set("line-height", "1.4");
 
-            boolean isMe = currentUser != null && log.getUser().getId().equals(currentUser.getId());
-            String roleStr = log.getUser().getRole().toString();
+            boolean isMe = currentUser != null && log.getUser() != null && log.getUser().getId().equals(currentUser.getId());
+            String roleStr = log.getUser() != null ? log.getUser().getRole().toString() : "";
 
             if (isMe) {
                 row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
@@ -367,7 +462,7 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
                 row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
                 bubble.getStyle().set("background-color", "#f1f5f9").set("color", "#1e293b").set("border-bottom-left-radius", "2px");
                 
-                Span label = new Span(log.getUser().getName() + " (" + roleStr + ")");
+                Span label = new Span((log.getUser() != null ? log.getUser().getName() : "Sistem") + " (" + roleStr + ")");
                 label.getStyle().set("font-weight", "bold").set("display", "block").set("margin-bottom", "4px");
                 bubble.add(label);
             }
@@ -403,7 +498,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         }
         chatHistoryArea.getElement().executeJs("this.scrollTop = this.scrollHeight;");
 
-        // Input and Send Controls for the Chat section
         TextArea chatInputArea = new TextArea();
         chatInputArea.setPlaceholder("Mesajınızı yazın...");
         chatInputArea.setWidthFull();
@@ -459,7 +553,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         chatSection.add(chatTitle, chatHistoryArea, chatInputArea, chatFileUpload, sendChatBtn);
         modalBody.add(chatSection);
 
-        // Delete action button
         Button deleteBtn = new Button("Talebi Sil", VaadinIcon.TRASH.create(), e -> {
             RequestStatus status = request.getStatus();
             
@@ -478,7 +571,7 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         
         deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
         deleteBtn.setEnabled(request.getStatus() != RequestStatus.APPROVED 
-                        && request.getStatus() != RequestStatus.COMPLETED);
+                    && request.getStatus() != RequestStatus.COMPLETED);
 
         Button cancelBtn = new Button("İptal Et", e -> modal.close());
         Button submitBtn = new Button("Güncelle", VaadinIcon.CHECK.create());
@@ -516,7 +609,6 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
 
             requestService.updateRequest(request);
 
-            // Log update event in communication flow
             workflowLogService.saveChatComment(
                 request.getId(), 
                 "[TALEP GÜNCELLENDİ] Müşteri talebini güncelledi.", 
@@ -536,15 +628,5 @@ public class CustomerDashboardView extends VerticalLayout implements BeforeEnter
         cancelBtn.getStyle().set("margin-left", "auto"); 
         modal.getFooter().add(deleteBtn, cancelBtn, submitBtn);
         modal.open();
-    }
-
-    private void refreshGridItems() {
-        if ("Geri Dönen Talepleriniz".equals(pageTitle.getText())) {
-            requestGrid.setItems(requestService.getAllRequests().stream()
-                    .filter(r -> r.getStatus() == RequestStatus.SENT_BACK)
-                    .toList());
-        } else {
-            requestGrid.setItems(requestService.getAllRequests());
-        }
     }
 }

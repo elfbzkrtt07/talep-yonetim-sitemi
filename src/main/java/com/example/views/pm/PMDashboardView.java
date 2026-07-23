@@ -9,6 +9,7 @@ import com.example.repositories.WorkflowLogRepository;
 import com.example.services.CompanyService;
 import com.example.services.RequestService;
 import com.example.services.WorkflowLogService;
+import com.example.views.base.BaseSecuredView;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -27,16 +28,14 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 @Route(value = "pm/dashboard", layout = MainLayout.class)
-public class PMDashboardView extends VerticalLayout implements BeforeEnterObserver {
+public class PMDashboardView extends BaseSecuredView {
 
     private final RequestService requestService;
     private final WorkflowLogService workflowLogService;
@@ -66,7 +65,6 @@ public class PMDashboardView extends VerticalLayout implements BeforeEnterObserv
 
     private List<Request> allRequests = new ArrayList<>();
     private Request selectedRequest = null;
-    private User currentUser = null;
 
     public PMDashboardView(RequestService requestService, 
                            WorkflowLogService workflowLogService,
@@ -90,12 +88,8 @@ public class PMDashboardView extends VerticalLayout implements BeforeEnterObserv
     }
 
     @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        if (currentUser == null) {
-            event.rerouteTo("login");
-            return;
-        }
+    protected void onUserAuthenticated(BeforeEnterEvent event, User user) {
+        this.currentUser = user;
         loadDashboardData();
     }
 

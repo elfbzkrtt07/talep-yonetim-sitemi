@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Repository
@@ -22,6 +24,7 @@ public interface WorkflowLogRepository extends JpaRepository<WorkflowLog, Long> 
     @Query("DELETE FROM WorkflowLog wl WHERE wl.request.id = :requestId")
     void deleteByRequestId(@Param("requestId") Long requestId);
 
+    @Transactional(readOnly = true)
     @Query("SELECT wl FROM WorkflowLog wl LEFT JOIN FETCH wl.user WHERE wl.request.id = :requestId")
     List<WorkflowLog> findByRequestIdWithUser(@Param("requestId") Long requestId);
 }

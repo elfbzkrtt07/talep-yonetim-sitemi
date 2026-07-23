@@ -3,22 +3,30 @@ package com.example.services;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.entities.Company;
 import com.example.entities.User;
 import com.example.enums.UserRole;
 import com.example.repositories.UserRepository;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 
 import jakarta.transaction.Transactional;
 
 @Service
 public class UserService {
     private UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+
     private final String userNotFound = "User not found with id: ";
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, EmailService emailService) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -27,7 +35,8 @@ public class UserService {
             throw new IllegalArgumentException("A user with this email already exists.");
         }
         user.setRole(role);
-        user.setApproved(false); 
+        user.setApproved(false);
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         return userRepository.save(user);
     }
 
@@ -58,6 +67,7 @@ public class UserService {
         existingUser.setRole(user.getRole());
         existingUser.setCompany(user.getCompany());
         existingUser.setDepartment(user.getDepartment());
+        existingUser.setApproved(user.isApproved());
         return userRepository.save(existingUser);
     }
 
@@ -81,6 +91,13 @@ public class UserService {
     }
 
     private void sendRejectionEmail(User user) {
-        // @TO-DO: Implement email sending logic here using java mail or any other email service.
+        try {
+            emailService.sendRejectionEmail(user.getEmail());
+            Notification.show("Ret e-postası başarıyla gönderildi.", 3000, Notification.Position.BOTTOM_START)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        } catch (Exception ex) {
+            Notification.show("E-posta gönderilemedi: " + ex.getMessage(), 4000, Notification.Position.MIDDLE)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
     }
 }

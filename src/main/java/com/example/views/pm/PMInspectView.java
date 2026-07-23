@@ -291,108 +291,128 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
     }
 
     private void updateUiContent() {
-            isUpdatingUi = true;
+        isUpdatingUi = true;
 
-            detailsCard.setWidthFull();
-            detailsCard.setPadding(true);
-            detailsCard.setSpacing(true);
-            detailsCard.getStyle()
-                    .set("background-color", "#ffffff")
-                    .set("border", "1px solid #e2e8f0")
-                    .set("border-radius", "12px")
-                    .set("box-shadow", "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)")
-                    .set("margin-bottom", "20px")
-                    .set("align-items", "stretch")
-                    .set("max-width", "100%")
-                    .set("box-sizing", "border-box");
+        detailsCard.setWidthFull();
+        detailsCard.setPadding(true);
+        detailsCard.setSpacing(true);
+        detailsCard.getStyle()
+                .set("background-color", "#ffffff")
+                .set("border", "1px solid #e2e8f0")
+                .set("border-radius", "12px")
+                .set("box-shadow", "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)")
+                .set("margin-bottom", "20px")
+                .set("align-items", "stretch")
+                .set("max-width", "100%")
+                .set("box-sizing", "border-box");
 
-            detailsCard.removeAll();
+        detailsCard.removeAll();
 
-            H2 titleHeader = new H2(targetRequest.getTitle());
-            titleHeader.getStyle()
-                    .set("margin", "0")
-                    .set("font-size", "1.4rem")
-                    .set("font-weight", "800")
-                    .set("color", "#0f172a")
-                    .set("word-break", "break-word")
-                    .set("overflow-wrap", "anywhere");
+        H2 titleHeader = new H2(targetRequest.getTitle());
+        titleHeader.getStyle()
+                .set("margin", "0")
+                .set("font-size", "1.4rem")
+                .set("font-weight", "800")
+                .set("color", "#0f172a")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
 
-            VerticalLayout descContainer = new VerticalLayout();
-            descContainer.setPadding(false);
-            descContainer.setSpacing(false);
-            descContainer.getStyle().set("margin-top", "4px");
+        VerticalLayout descContainer = new VerticalLayout();
+        descContainer.setPadding(false);
+        descContainer.setSpacing(false);
+        descContainer.getStyle().set("margin-top", "4px");
 
-            Span descLabel = new Span("TALEP AÇIKLAMASI");
-            descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
+        Span descLabel = new Span("TALEP AÇIKLAMASI");
+        descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
 
-            Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Açıklama belirtilmemiş.");
-            descBody.getStyle()
-                    .set("font-size", "0.95rem")
-                    .set("color", "#334155")
-                    .set("white-space", "pre-wrap")
-                    .set("word-break", "break-word")
-                    .set("overflow-wrap", "anywhere");
-            descContainer.add(descLabel, descBody);
+        Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Açıklama belirtilmemiş.");
+        descBody.getStyle()
+                .set("font-size", "0.95rem")
+                .set("color", "#334155")
+                .set("white-space", "pre-wrap")
+                .set("word-break", "break-word")
+                .set("overflow-wrap", "anywhere");
+        descContainer.add(descLabel, descBody);
 
-            HorizontalLayout badgesRow = new HorizontalLayout();
-            badgesRow.setSpacing(true);
+        HorizontalLayout badgesRow = new HorizontalLayout();
+        badgesRow.setSpacing(true);
+        badgesRow.getStyle().set("flex-wrap", "wrap");
 
-            Span affectedBadge = new Span();
-            affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
-            if (targetRequest.getAffectedNo() != null) {
-                affectedBadge.setText(targetRequest.getAffectedNo() + " Kullanıcı Etkileniyor");
-                affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
-            } else {
-                affectedBadge.setText("Etkilenen Sayısı Belirtilmemiş");
-                affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
-            }
-
-            Span companyBadge = new Span();
-            companyBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
-            if (targetRequest.getCustomer() != null && targetRequest.getCustomer().getCompany() != null) {
-                String companyName = targetRequest.getCustomer().getCompany().getName();
-                double companyScore = targetRequest.getCustomer().getCompany().getCompanyScore();
-                companyBadge.setText(companyName + " (Score: " + companyScore + ")");
-                companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
-            } else {
-                companyBadge.setText("Bireysel Müşteri");
-                companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
-            }
-
-            badgesRow.add(affectedBadge, companyBadge);
-            detailsCard.add(titleHeader, descContainer, badgesRow);
-            
-            boolean hasExistingPrioritization = false;
-            
-            try {
-                Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
-                urgencySelect.setValue(existingPrior.getUrgency());
-                typeSelect.setValue(existingPrior.getTaskType());
-                departmentField.setValue(existingPrior.getDepartment());
-                
-                updateScoreBadgeVisuals(existingPrior.getPriorityScore());
-                hasExistingPrioritization = true;
-                if (existingPrior.getSmTechnicalScore() != null) {
-                    techScoreValue.setText(String.valueOf(existingPrior.getSmTechnicalScore()));
-                    techScoreLayout.setVisible(true);
-                }
-                
-            } catch (Exception ex) {
-                impactSelect.setValue(1);
-                urgencySelect.setValue(1);
-                if (TaskType.values().length > 0) typeSelect.setValue(TaskType.values()[0]);
-                departmentField.setValue(null);
-                techScoreLayout.setVisible(false);
-            } finally {
-                isUpdatingUi = false;
-                
-                if (!hasExistingPrioritization) {
-                    refreshCalculatedScoreText();
-                }
-                refreshChatHistoryWindow();
-            }
+        Span affectedBadge = new Span();
+        affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (targetRequest.getAffectedNo() != null) {
+            affectedBadge.setText(targetRequest.getAffectedNo() + " Kişi Etkileniyor");
+            affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
+            badgesRow.add(affectedBadge);
         }
+
+        Span companyBadge = new Span();
+        companyBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
+        if (targetRequest.getCustomer() != null && targetRequest.getCustomer().getCompany() != null) {
+            String companyName = targetRequest.getCustomer().getCompany().getName();
+            double companyScore = targetRequest.getCustomer().getCompany().getCompanyScore();
+            companyBadge.setText(companyName + " (Score: " + companyScore + ")");
+            companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
+        } else {
+            companyBadge.setText("Bireysel Müşteri");
+            companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+        }
+        badgesRow.add(companyBadge);
+
+        if (targetRequest.getDeadline() != null) {
+            Span deadlineBadge = new Span("Deadline: " + targetRequest.getDeadline().toString());
+            deadlineBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700")
+                    .set("background-color", "#fef3c7").set("color", "#92400e");
+            badgesRow.add(deadlineBadge);
+        }
+
+        if (Boolean.TRUE.equals(targetRequest.getIsSecurityRisk())) {
+            Span securityBadge = new Span("Kritik: Güvenlik/KVKK Riski");
+            securityBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700")
+                    .set("background-color", "#fee2e2").set("color", "#991b1b");
+            badgesRow.add(securityBadge);
+        }
+
+        if (targetRequest.getFinancialImpact() != null && !targetRequest.getFinancialImpact().isBlank()) {
+            Span financialBadge = new Span("Mali Etki: " + targetRequest.getFinancialImpact());
+            financialBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700")
+                    .set("background-color", "#f3e8ff").set("color", "#6b21a8");
+            badgesRow.add(financialBadge);
+        }
+
+        detailsCard.add(titleHeader, descContainer, badgesRow);
         
+        boolean hasExistingPrioritization = false;
+        
+        try {
+            Prioritization existingPrior = prioritizationService.getPrioritizationById(targetRequest.getId());
+            urgencySelect.setValue(existingPrior.getUrgency());
+            typeSelect.setValue(existingPrior.getTaskType());
+            departmentField.setValue(existingPrior.getDepartment());
+            
+            updateScoreBadgeVisuals(existingPrior.getPriorityScore());
+            hasExistingPrioritization = true;
+            if (existingPrior.getSmTechnicalScore() != null) {
+                techScoreValue.setText(String.valueOf(existingPrior.getSmTechnicalScore()));
+                techScoreLayout.setVisible(true);
+            }
+            
+        } catch (Exception ex) {
+            impactSelect.setValue(1);
+            urgencySelect.setValue(1);
+            if (TaskType.values().length > 0) typeSelect.setValue(TaskType.values()[0]);
+            departmentField.setValue(null);
+            techScoreLayout.setVisible(false);
+        } finally {
+            isUpdatingUi = false;
+            
+            if (!hasExistingPrioritization) {
+                refreshCalculatedScoreText();
+            }
+            refreshChatHistoryWindow();
+        }
+    }
+
     private void refreshChatHistoryWindow() {
         chatHistoryArea.removeAll();
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
@@ -598,7 +618,7 @@ public class PMInspectView extends VerticalLayout implements HasUrlParameter<Lon
                 
                 if (wf == null) {
                     wf = new Workflow();
-                    wf.setworkflowId(requestId);
+                    wf.setWorkflowId(requestId);
                     wf.setRequest(targetRequest);
                     wf.setCreatedAt(java.time.LocalDateTime.now());
                 }

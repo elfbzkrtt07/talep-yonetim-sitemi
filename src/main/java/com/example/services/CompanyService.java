@@ -39,7 +39,8 @@ public class CompanyService {
         
         existingCompany.setName(company.getName());
         existingCompany.setCompanyScore(company.getCompanyScore());
-
+        existingCompany.setActive(company.isActive());
+        
         return companyRepository.save(existingCompany);
     }
     

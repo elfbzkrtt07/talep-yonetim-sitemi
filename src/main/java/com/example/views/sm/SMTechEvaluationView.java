@@ -19,8 +19,8 @@ import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -40,6 +40,7 @@ import com.vaadin.flow.server.StreamResource;
 import com.vaadin.flow.server.VaadinSession;
 
 import java.io.ByteArrayInputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -325,10 +326,10 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
         descContainer.setSpacing(false);
         descContainer.getStyle().set("margin-top", "4px");
 
-        Span descLabel = new Span("TALEP ACIKLAMASI");
+        Span descLabel = new Span("TALEP AÇIKLAMASI");
         descLabel.getStyle().set("font-size", "0.75rem").set("font-weight", "800").set("color", "#64748b").set("margin-bottom", "4px");
 
-        Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Aciklama belirtilmemis.");
+        Span descBody = new Span(targetRequest.getDescription() != null ? targetRequest.getDescription() : "Açıklama belirtilmemiş.");
         descBody.getStyle()
                 .set("font-size", "0.95rem")
                 .set("color", "#334155")
@@ -339,15 +340,50 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
 
         HorizontalLayout badgesRow = new HorizontalLayout();
         badgesRow.setSpacing(true);
+        badgesRow.getStyle().set("flex-wrap", "wrap").set("gap", "6px").set("margin-top", "8px");
 
         Span affectedBadge = new Span();
         affectedBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700");
-        if (targetRequest.getAffectedNo() != null) {
-            affectedBadge.setText(targetRequest.getAffectedNo() + " Etkilenen");
+        if (targetRequest.getAffectedNo() != null && targetRequest.getAffectedNo() > 0) {
+            affectedBadge.setText("👥 " + targetRequest.getAffectedNo() + " Etkilenen");
             affectedBadge.getStyle().set("background-color", "#e0f2fe").set("color", "#0369a1");
-        } else {
-            affectedBadge.setText("Belirtilmemis");
-            affectedBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
+            badgesRow.add(affectedBadge);
+        }
+
+        if (targetRequest.getDeadline() != null) {
+            Span deadlineBadge = new Span("Deadline: " + targetRequest.getDeadline().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+            deadlineBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#fef3c7")
+                    .set("color", "#b45309");
+            badgesRow.add(deadlineBadge);
+        }
+
+        if (Boolean.TRUE.equals(targetRequest.getIsSecurityRisk())) {
+            Span securityBadge = new Span("KVKK / Güvenlik Riski");
+            securityBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#fee2e2")
+                    .set("color", "#991b1b");
+            badgesRow.add(securityBadge);
+        }
+
+        if (targetRequest.getFinancialImpact() != null && !targetRequest.getFinancialImpact().isBlank() && !"Etkisi Yok".equalsIgnoreCase(targetRequest.getFinancialImpact())) {
+            Span financialBadge = new Span("Mali Etki: " + targetRequest.getFinancialImpact());
+            financialBadge.getStyle()
+                    .set("padding", "6px 12px")
+                    .set("border-radius", "9999px")
+                    .set("font-size", "0.8rem")
+                    .set("font-weight", "700")
+                    .set("background-color", "#f0fdf4")
+                    .set("color", "#166534");
+            badgesRow.add(financialBadge);
         }
 
         Span companyBadge = new Span();
@@ -358,14 +394,15 @@ public class SMTechEvaluationView extends VerticalLayout implements HasUrlParame
             companyBadge.setText(companyName + " (Score: " + companyScore + ")");
             companyBadge.getStyle().set("background-color", "#f0fdf4").set("color", "#166534");
         } else {
-            companyBadge.setText("Bireysel Musteri");
+            companyBadge.setText("Bireysel Müşteri");
             companyBadge.getStyle().set("background-color", "#f1f5f9").set("color", "#475569");
         }
+        badgesRow.add(companyBadge);
 
         Span deptBadge = new Span("Departman: " + deptNameStr);
         deptBadge.getStyle().set("padding", "6px 12px").set("border-radius", "9999px").set("font-size", "0.8rem").set("font-weight", "700").set("background-color", "#faf5ff").set("color", "#6b21a8");
+        badgesRow.add(deptBadge);
 
-        badgesRow.add(affectedBadge, companyBadge, deptBadge);
         detailsCard.add(titleHeader, descContainer, badgesRow);
         
         pmScoreDisplay.setText(String.valueOf(currentPrioritization.getPriorityScore()));

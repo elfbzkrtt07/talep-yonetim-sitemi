@@ -2,23 +2,21 @@ package com.example.base.ui;
 
 import com.example.entities.User;
 import com.example.enums.UserRole;
+import com.example.views.auth.ProfileView;
+import com.example.views.auth.SystemSettingsView;
+import com.example.views.customer.CustomerDashboardView;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
-import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.RouterLink;
 import com.vaadin.flow.server.VaadinSession;
-import com.example.views.HomeView;
-import com.example.views.customer.CustomerDashboardView;
 
 public class MainLayout extends AppLayout {
 
@@ -34,8 +32,7 @@ public class MainLayout extends AppLayout {
                       .set("font-weight", "bold");
 
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
-        String userName = currentUser != null ? currentUser.getName() : "Misafir Kullanıcı";
-        String userEmail = currentUser != null ? currentUser.getEmail() : "";
+        String userName = (currentUser != null && currentUser.getName() != null) ? currentUser.getName() : "Kullanıcı";
 
         Avatar avatar = new Avatar(userName);
         avatar.getStyle().set("cursor", "pointer");
@@ -45,22 +42,24 @@ public class MainLayout extends AppLayout {
         profileWrapper.setSpacing(true);
         profileWrapper.getStyle().set("margin-right", "var(--lumo-space-m)");
 
-        // Dropdown menu attached to the profile wrapper
         ContextMenu profileMenu = new ContextMenu(profileWrapper);
         profileMenu.setOpenOnClick(true);
 
         profileMenu.addItem("Profil Ayarları", e -> {
-            Notification.show("Profil ayarları yakında eklenecek.");
+            UI.getCurrent().navigate(ProfileView.class);
         });
         
         profileMenu.addItem("Sistem Seçenekleri", e -> {
-            Notification.show("Sistem ayarları ayarlanıyor...");
+            if (currentUser != null && currentUser.getRole() != null && currentUser.getRole().equals(UserRole.CUSTOMER)) {
+                UI.getCurrent().navigate(SystemSettingsView.class);   
+            }
         });
         
         profileMenu.addSeparator();
         profileMenu.addItem("Çıkış", e -> {
-            VaadinSession.getCurrent().close();
-            UI.getCurrent().getPage().setLocation("/login");
+            VaadinSession.getCurrent().setAttribute("user", null);
+            UI.getCurrent().getPage().executeJs("sessionStorage.removeItem('auth_token');");
+            UI.getCurrent().navigate("login");
         });
 
         HorizontalLayout header = new HorizontalLayout(new DrawerToggle(), logo, profileWrapper);
@@ -84,7 +83,6 @@ public class MainLayout extends AppLayout {
         User currentUser = (User) VaadinSession.getCurrent().getAttribute("user");
 
         if (currentUser == null || currentUser.getRole() == null) {
-            menuContainer.add(new Span("Menü yüklenemedi: Oturum Yok"));
             addToDrawer(menuContainer);
             return;
         }
@@ -92,6 +90,14 @@ public class MainLayout extends AppLayout {
         UserRole role = currentUser.getRole();
 
         switch (role) {
+            case ADMIN:
+                RouterLink adminHome = new RouterLink("Ana Sayfa", com.example.views.admin.AdminDashboardView.class);
+                RouterLink adminUsers = new RouterLink("Kullanıcılar", com.example.views.admin.AdminUsersView.class); 
+                RouterLink adminCompanies = new RouterLink("Şirketler", com.example.views.admin.AdminCompaniesView.class);
+                RouterLink adminSupport = new RouterLink("Destek Talepleri", com.example.views.admin.AdminSupportView.class);
+
+                menuContainer.add(adminHome, adminUsers, adminCompanies, adminSupport);
+                break;
 
             case CUSTOMER:
                 RouterLink customerDash = new RouterLink("Taleplerim", CustomerDashboardView.class);
@@ -110,9 +116,8 @@ public class MainLayout extends AppLayout {
                 RouterLink pmPriorities = new RouterLink("Öncelik Havuzu", com.example.views.pm.PMPrioritizationsView.class);
                 RouterLink pmWorkflows = new RouterLink("İş Akışları", com.example.views.pm.PMWorkflowsView.class);
                 RouterLink pmSentBack = new RouterLink("Geri Gönderilenler", com.example.views.pm.PMSentBackView.class);
-                // RouterLink pmAnalytics = new RouterLink("Analitik Raporlar", com.example.views.pm.PMAnalyticsView.class);
                 
-                menuContainer.add(pmHome, pmRequests, pmPriorities, pmWorkflows, pmSentBack/*, pmAnalytics);*/ );
+                menuContainer.add(pmHome, pmRequests, pmPriorities, pmWorkflows, pmSentBack);
                 break;
 
             case DEVELOPER:
@@ -127,13 +132,14 @@ public class MainLayout extends AppLayout {
                 RouterLink smSentBack = new RouterLink("Geri Gönderilen İş Akışları", com.example.views.sm.SMSentBackView.class);
                 RouterLink smDeptHistory = new RouterLink("Departman İş Geçmişi", com.example.views.sm.SMJobHistoryView.class);
                 RouterLink smDevMonitor = new RouterLink("Ekip Yönetimi", com.example.views.sm.SMDeveloperMonitorView.class);
-                menuContainer.add(smHome, smInbox, smSentBack, smDeptHistory, smDevMonitor/* , smAnalytics*/);
+                menuContainer.add(smHome, smInbox, smSentBack, smDeptHistory, smDevMonitor);
                 break;
 
             default:
-                menuContainer.add(new Span("Bilinmeyen Rol Menüsü"));
                 break;
         }
+
+        menuContainer.add(new RouterLink("Profilim", ProfileView.class));
 
         addToDrawer(menuContainer);
     }

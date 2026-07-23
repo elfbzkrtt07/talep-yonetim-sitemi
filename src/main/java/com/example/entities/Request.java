@@ -23,8 +23,7 @@ public class Request {
     @Column(nullable = false)
     private String title;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description", length = 4000)
     private String description;
 
     @jakarta.persistence.Lob
@@ -33,17 +32,26 @@ public class Request {
     private String fileName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 50)
     private RequestStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private java.time.LocalDateTime createdAt;
+    private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
-    private java.time.LocalDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
     @Column(name = "affected_no")
     private Integer affectedNo;
+
+    @Column(name = "deadline")
+    private LocalDate deadline;
+
+    @Column(name = "is_security_risk")
+    private Boolean isSecurityRisk = false;
+
+    @Column(name = "financial_impact")
+    private String financialImpact;
 
     public Request() {}
 
@@ -52,19 +60,22 @@ public class Request {
         this.title = title;
         this.description = description;
         this.affectedNo = affectedNo;
-        this.createdAt = java.time.LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
         this.status = RequestStatus.PENDING;
     }
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = java.time.LocalDateTime.now();
-        this.updatedAt = java.time.LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = RequestStatus.PENDING;
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = java.time.LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -88,12 +99,21 @@ public class Request {
     public RequestStatus getStatus() { return status; }
     public void setStatus(RequestStatus status) { this.status = status; }
 
-    public java.time.LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(java.time.LocalDateTime time) { this.createdAt = time; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime time) { this.createdAt = time; }
 
-    public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(java.time.LocalDateTime time) { this.updatedAt = time; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime time) { this.updatedAt = time; }
 
     public Integer getAffectedNo() { return affectedNo; }
     public void setAffectedNo(Integer affectedNo) { this.affectedNo = affectedNo; }
+
+    public LocalDate getDeadline() { return deadline; }
+    public void setDeadline(LocalDate deadline) { this.deadline = deadline; }
+
+    public Boolean getIsSecurityRisk() { return isSecurityRisk; }
+    public void setIsSecurityRisk(Boolean isSecurityRisk) { this.isSecurityRisk = isSecurityRisk; }
+
+    public String getFinancialImpact() { return financialImpact; }
+    public void setFinancialImpact(String financialImpact) { this.financialImpact = financialImpact; }
 }

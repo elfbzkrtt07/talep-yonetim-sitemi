@@ -23,7 +23,7 @@ public class Prioritization {
     private Integer impact;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "task_type", nullable = false)
+    @Column(name = "task_type", nullable = false, length = 50) 
     private TaskType taskType;
 
     @ManyToOne(fetch = FetchType.EAGER)

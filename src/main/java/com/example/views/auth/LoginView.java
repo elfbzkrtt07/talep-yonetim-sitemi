@@ -1,12 +1,16 @@
 package com.example.views.auth;
 
-import com.example.entities.Department;
 import com.example.entities.User;
+import com.example.enums.RequestStatus;
 import com.example.enums.UserRole;
+import com.example.services.CompanyService;
 import com.example.services.DepartmentService;
+import com.example.services.JwtService;
+import com.example.services.SupportRequestService;
 import com.example.services.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Paragraph;
@@ -21,12 +25,19 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinSession;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Route(value = "login", autoLayout = false)
 public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private final UserService userService;
     private final DepartmentService departmentService;
+    private final CompanyService companyService;
+    private final SupportRequestService supportRequestService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     private final H2 loginTitle = new H2("Giriş Yap");
     private final H2 registerTitle = new H2("Hesap Oluştur");
@@ -35,9 +46,16 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private final Select<UserRole> roleSelect = new Select<>();
 
-    public LoginView(UserService userService, DepartmentService departmentService) {
+    public LoginView(UserService userService, DepartmentService departmentService, 
+                     CompanyService companyService, SupportRequestService supportRequestService,
+                     PasswordEncoder passwordEncoder,
+                     JwtService jwtService) {
         this.userService = userService;
         this.departmentService = departmentService;
+        this.companyService = companyService;
+        this.supportRequestService = supportRequestService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
 
         injectCustomCSS();
 
@@ -88,14 +106,18 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
             }
 
             userService.findByEmail(inputEmail).ifPresentOrElse(user -> {
-                if (user.getPassword().equals(inputPass)) {
+                if (passwordEncoder.matches(inputPass, user.getPassword())) {
                     if (user.isApproved()) {
+                        String token = jwtService.generateToken(user);
+                        
+                        VaadinSession.getCurrent().setAttribute("user", user);
+                        UI.getCurrent().getPage().executeJs("sessionStorage.setItem('auth_token', $0);", token);
+
                         Notification.show("Giriş Başarılı!").addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                        com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("user", user);
                         UI.getCurrent().navigate(user.getRole().getUrlSegment() + "/dashboard");
                     } else {
                         this.removeAll();
-                        this.add(new WaitingApprovalView(user.getName(), user.getRole().name().toLowerCase()));
+                        this.add(new WaitingApprovalView(user, user.getRole().name().toLowerCase(), departmentService, companyService, supportRequestService, userService));
                     }
                 } else {
                     Notification.show("Hatalı Şifre!").addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -103,7 +125,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
             }, () -> Notification.show("Kullanıcı bulunamadı!").addThemeVariants(NotificationVariant.LUMO_ERROR));
         });
 
-        leftPanel.add(loginTitle, loginSub, loginEmail, loginPassword, loginBtn);
+        Button forgotPasswordLink = new Button("Şifremi Unuttum?", e -> UI.getCurrent().navigate("forgot-password"));
+        forgotPasswordLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        leftPanel.add(loginTitle, loginSub, loginEmail, loginPassword, loginBtn, forgotPasswordLink);
 
         VerticalLayout rightPanel = new VerticalLayout();
         rightPanel.setWidth("50%");
@@ -115,9 +140,13 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         registerSub.addClassName("premium-subtext");
 
         roleSelect.setLabel("Rol Seçin");
-        roleSelect.setItems(UserRole.values());
+        roleSelect.setItems(
+            java.util.Arrays.stream(UserRole.values())
+                .filter(role -> role != UserRole.ADMIN)
+                .toList()
+        );
         roleSelect.setItemLabelGenerator(role -> role.toString()); 
-        styleSelectorField(roleSelect, VaadinIcon.USER_CHECK); // Changed from FACTORY to USER_CHECK
+        styleSelectorField(roleSelect, VaadinIcon.USER_CHECK); 
 
         roleSelect.addValueChangeListener(e -> {
             UserRole selected = e.getValue();
@@ -153,11 +182,14 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
                 userService.registerNewUser(newUser, targetRole);
                 
-                Notification n = Notification.show("Kayıt Alındı! Onay bekleniyor.");
+                User savedUser = userService.findByEmail(newUser.getEmail()).orElse(newUser);
+                
+                Notification n = Notification.show("Kayıt Alındı! Onay detaylarını giriniz.");
                 n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 
-                regName.clear(); regEmail.clear(); regPass.clear();
-                roleSelect.setValue(UserRole.CUSTOMER); 
+                this.removeAll();
+                this.add(new WaitingApprovalView(savedUser, targetRole.name().toLowerCase(), departmentService, companyService, supportRequestService, userService));
+
             } catch (Exception e) {
                 Notification.show("Hata: " + e.getMessage()).addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
@@ -174,9 +206,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
         if (queryParams.containsKey("approved") && "false".equals(queryParams.get("approved").get(0))) {
             this.removeAll();
-            this.add(new WaitingApprovalView("Kullanıcı", "user"));
+            this.add(new WaitingApprovalView(null, "customer", departmentService, companyService, supportRequestService, userService));
         }
     }
+
 
     private void styleInputField(TextField f, VaadinIcon icon) {
         f.setWidthFull();

@@ -4,6 +4,7 @@ import java.util.List;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "elif_companies")
@@ -23,6 +24,9 @@ public class Company {
     @OneToMany(mappedBy = "company", fetch = FetchType.LAZY)
     private List<User> users;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
     public Company() {}
 
     public Company(String name, Double companyScore) {
@@ -41,4 +45,7 @@ public class Company {
 
     public List<User> getUsers() { return users; }
     public void setUsers(List<User> users) { this.users = users; }
+
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
 }

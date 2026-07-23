@@ -25,7 +25,7 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
+    @Column(name = "role", nullable = false, length = 50)
     private UserRole role;
 
     @ManyToOne(fetch = FetchType.EAGER)

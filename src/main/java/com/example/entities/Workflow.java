@@ -22,7 +22,7 @@ public class Workflow {
     private User currentAssignee;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = false, length = 50)
     private WorkflowStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -50,8 +50,8 @@ public class Workflow {
         this.status = status;
     }
 
-    public Long getworkflowId() { return workflowId; }
-    public void setworkflowId(Long workflowId) { this.workflowId = workflowId; }
+    public Long getWorkflowId() { return workflowId; }
+    public void setWorkflowId(Long workflowId) { this.workflowId = workflowId; }
 
     public Request getRequest() { return request; }
     public void setRequest(Request request) { this.request = request; }
